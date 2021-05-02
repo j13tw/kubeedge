@@ -9,14 +9,14 @@
 
 ## Overview About testManager Module
 
-* testManager is a utility module to mimic the cloud and push messages for different kinds of actions that could happen from the cloud. Typical device , node and application lifecycle management functions are expected to be performed in the cloud and pushed to the edge node. These functions commonly encompass configurations related to 
-    
+* testManager is a utility module to mimic the cloud and push messages for different kinds of actions that could happen from the cloud. Typical device , node and application lifecycle management functions are expected to be performed in the cloud and pushed to the edge node. These functions commonly encompass configurations related to
+
      - Kubernetes Secrets and Configuration Maps.
      - Application deployment/sync
      - Binding devices to edge nodes via memberships.
      - Syncing of different resources between cloud and edge ( like app status, device status etc)
      - Node sync, etc..
-     
+
 Below info can help user how to use the testManager for testing the kubeedge.
 
 * testManager module starts http server on port 12345 to let users interact with kubeedge and perform operations which would be typically performed from cloud.
@@ -26,22 +26,22 @@ It exposes its API's to do the following
     - /devices      : Bind a Device to kubeedge node.
     - /secrets      : Configure secrets on kubeedge node.
     - /configmaps   : Configure configmaps on kubeedge node.
-    
-Using above API's user can perform the resource operations against running edge node.
-    
-testManager facilitates validating the capabilities of the edge platform by performing **curl** operations against a running edge node. 
 
-Following sections will explain the procedure to test the kubeedge with testManager. 
+Using above API's user can perform the resource operations against running edge node.
+
+testManager facilitates validating the capabilities of the edge platform by performing **curl** operations against a running edge node.
+
+Following sections will explain the procedure to test the kubeedge with testManager.
 
 ## Test with `TestManager` Module
 
 ### Compile
 
 ```shell
-# generate the `edge_core` binary 
+# generate the `edgecore` binary
 make
 # or
-make edge_core
+make edgecore
 ```
 ### Configure
 
@@ -49,7 +49,7 @@ make edge_core
 
 ##### in `modules.yaml` (add the `testManager`)
 
-Kubeedge uses [beehive](https://github.com/kubeedge/kubeedge/blob/master/docs/modules/beehive.md) framework as the inter-module communication, all modules in the kubeedge need to register with beehive.
+KubeEdge uses [beehive](../../docs/components/beehive.md) framework as the inter-module communication, all modules in the kubeedge need to register with beehive.
 `testManager` is a module like other KubeEdge modules. So, it has to be configured as shown below.
 
 ```yaml
@@ -83,7 +83,7 @@ edgehub:
         auth-info-files-path: /var/IEF/secret
         placement-url: https://10.154.193.32:7444/v1/placement_external/message_queue
         project-id: e632aba927ea4ac2b575ec1603d56f10
-        node-id: fb4ebb70-2783-42b8-b3ef-63e2fd6d242e
+        node-id: edge-node
 
 edged:
     register-node-namespace: default
@@ -95,14 +95,15 @@ edged:
     image-gc-high-threshold: 80 # percent
     image-gc-low-threshold: 40 # percent
     maximum-dead-containers-per-container: 1
+    docker-address: unix:///var/run/docker.sock
     version: 2.0.0
 ```
 
 ```bash
-# run edge_core
-./edge_core
+# run edgecore
+./edgecore
 # or
-nohup ./edge_core > edge_core.log 2>&1 &
+nohup ./edgecore > edgecore.log 2>&1 &
 ```
 
 ### Test kubeedge with External MQTT Server
@@ -125,10 +126,10 @@ apt install -y mosquitto
 ```bash
 # run mosquitto
 mosquitto -d -p 1883
-# run edge_core
-./edge_core
+# run edgecore
+./edgecore
 # or
-nohup ./edge_core > edge_core.log 2>&1 &
+nohup ./edgecore > edgecore.log 2>&1 &
 ```
 
 ### Verify
@@ -146,9 +147,9 @@ curl -X PUT \
 		"state": "online"
 	}]
 }'
-``` 
+```
 
-#### Verify the DB 
+#### Verify the DB
 ```bash
 # Enter the database
 sqlite3 edge.db
@@ -170,7 +171,7 @@ curl -X DELETE \
 		"state": "online"
 	}]
 }'
-``` 
+```
 
 #### Add Pod
 ```bash
@@ -196,7 +197,7 @@ curl -i -v -X POST http://127.0.0.1:12345/pod -d '{
 ```
 #### Query Pods
 ```bash
-curl -i -v -X GET http://127.0.0.1:12345/pod 
+curl -i -v -X GET http://127.0.0.1:12345/pod
 
 #or (To display response in json format)
 
@@ -214,7 +215,7 @@ select * from meta;
 
 # or you can check the pod container using `docker ps`
 ```
-### Remove Pod 
+### Remove Pod
 ```bash
 curl -i -v -X DELETE http://127.0.0.1:12345/pod -d '{
   "apiVersion": "v1",

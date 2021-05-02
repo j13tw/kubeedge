@@ -25,15 +25,23 @@ import (
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
-	"github.com/kubeedge/beehive/pkg/common/log"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/klog/v2"
+
+	eventconfig "github.com/kubeedge/kubeedge/edge/pkg/eventbus/config"
+	"github.com/kubeedge/kubeedge/pkg/apis/componentconfig/edgecore/v1alpha1"
 )
 
 var clientOptions = MQTT.NewClientOptions()
 
+func init() {
+	nodeName := "testEdge"
+	cfg := v1alpha1.NewDefaultEdgeCoreConfig()
+	eventconfig.InitConfigure(cfg.Modules.EventBus, nodeName)
+}
+
 //TestCheckKeyExist checks the functionality of CheckKeyExist function
 func TestCheckKeyExist(t *testing.T) {
-
 	tests := []struct {
 		name          string
 		keys          []string
@@ -161,7 +169,7 @@ func TestHubClientInit(t *testing.T) {
 			tt.want.ClientID = tt.clientID
 			tt.want.Username = tt.username
 			tt.want.Password = tt.password
-			tt.want.TLSConfig = tls.Config{InsecureSkipVerify: true, ClientAuth: tls.NoClientCert}
+			tt.want.TLSConfig = &tls.Config{InsecureSkipVerify: true, ClientAuth: tls.NoClientCert}
 			got := HubClientInit(tt.server, tt.clientID, tt.username, tt.password)
 			assert.Equal(t, tt.want.Servers, got.Servers)
 			assert.Equal(t, tt.want.ClientID, got.ClientID)
@@ -206,7 +214,7 @@ func TestLoopConnect(t *testing.T) {
 						t.Errorf("common.TestLoopConnect() Options.Servers = %v, want connect =  %v", tt.clientOptions.Servers, tt.connect)
 					}
 				}
-				log.LOGGER.Infof("No servers defined to connect to")
+				klog.Info("No servers defined to connect to")
 			}
 		})
 	}

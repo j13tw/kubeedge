@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,10 +26,13 @@ import (
 )
 
 // StorageClassLister helps list StorageClasses.
+// All objects returned here must be treated as read-only.
 type StorageClassLister interface {
 	// List lists all StorageClasses in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.StorageClass, err error)
 	// Get retrieves the StorageClass from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.StorageClass, error)
 	StorageClassListerExpansion
 }

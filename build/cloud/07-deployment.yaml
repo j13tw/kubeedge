@@ -3,53 +3,25 @@ kind: Deployment
 metadata:
   labels:
     k8s-app: kubeedge
-    kubeedge: edgecontroller
-  name: edgecontroller
+    kubeedge: cloudcore
+  name: cloudcore
   namespace: kubeedge
 spec:
   selector:
     matchLabels:
       k8s-app: kubeedge
-      kubeedge: edgecontroller
+      kubeedge: cloudcore
   template:
     metadata:
       labels:
         k8s-app: kubeedge
-        kubeedge: edgecontroller
+        kubeedge: cloudcore
     spec:
-      initContainers:
-      - name: kubeconfig
-        image: alpine:3.9
-        volumeMounts:
-        - name: kubeconfig
-          mountPath: /etc/kubeedge/cloud
-          subPath: kubeconfig.yaml
-        command:
-        - /bin/sh
-        - -c
-        - |
-          apk --no-cache add coreutils && cat | tee /etc/kubeedge/cloud/kubeconfig.yaml <<EOF
-          apiVersion: v1
-          kind: Config
-          clusters:
-          - name: kubeedge
-            cluster:
-              certificate-authority-data: $(cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt | base64 -w 0)
-          users:
-          - name: kubeedge
-            user:
-              token: $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-          contexts:
-          - name: kubeedge
-            context:
-              cluster: kubeedge
-              user: kubeedge
-          current-context: kubeedge
-          EOF
+      hostNetwork: true
       containers:
-      - name: edgecontroller
-        image: kubeedge/edgecontroller:v0.2
-        imagePullPolicy: Always
+      - name: cloudcore
+        image: kubeedge/cloudcore:v1.3.1
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 10000
           name: cloudhub
@@ -63,21 +35,24 @@ spec:
             memory: 512Mi
         volumeMounts:
         - name: conf
-          mountPath: /etc/kubeedge/cloud/conf
+          mountPath: /etc/kubeedge/config
         - name: certs
-          mountPath: /etc/kubeedge/cloud/certs
-        - name: kubeconfig
-          mountPath: /etc/kubeedge/cloud
-          subPath: kubeconfig.yaml
+          mountPath: /etc/kubeedge
+        - name: sock
+          mountPath: /var/lib/kubeedge
       restartPolicy: Always
-      serviceAccount: edgecontroller
-      serviceAccountName: edgecontroller
+      serviceAccount: cloudcore
+      serviceAccountName: cloudcore
       volumes:
       - name: conf
         configMap:
-          name: edgecontroller
+          name: cloudcore
       - name: certs
-        secret:
-          secretName: edgecontroller
-      - name: kubeconfig
-        emptyDir: {}
+        hostPath:
+          path: /etc/kubeedge
+          type: DirectoryOrCreate
+      - name: sock
+        hostPath:
+          path: /var/lib/kubeedge
+          type: DirectoryOrCreate
+

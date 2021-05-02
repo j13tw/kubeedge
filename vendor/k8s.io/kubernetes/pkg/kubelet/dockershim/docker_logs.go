@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -17,11 +19,10 @@ limitations under the License.
 package dockershim
 
 import (
+	"context"
 	"fmt"
 
-	"golang.org/x/net/context"
-
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // ReopenContainerLog reopens the container log file.

@@ -2,13 +2,16 @@ package util
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
+	"io/ioutil"
 	"os"
 	"time"
 
-	"github.com/kubeedge/beehive/pkg/common/log"
-
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	"k8s.io/klog/v2"
+
+	eventconfig "github.com/kubeedge/kubeedge/edge/pkg/eventbus/config"
 )
 
 var (
@@ -21,7 +24,7 @@ func CheckKeyExist(keys []string, disinfo map[string]interface{}) error {
 	for _, v := range keys {
 		_, ok := disinfo[v]
 		if !ok {
-			log.LOGGER.Errorf("key: %s not found", v)
+			klog.Errorf("key: %s not found", v)
 			return errors.New("key not found")
 		}
 	}
@@ -51,19 +54,50 @@ func HubClientInit(server, clientID, username, password string) *MQTT.ClientOpti
 			opts.SetPassword(password)
 		}
 	}
-	tlsConfig := &tls.Config{InsecureSkipVerify: true, ClientAuth: tls.NoClientCert}
+
+	klog.V(4).Infof("Start to set TLS configuration for MQTT client")
+	tlsConfig := &tls.Config{}
+	if eventconfig.Config.TLS.Enable {
+		cert, err := tls.LoadX509KeyPair(eventconfig.Config.TLS.TLSMqttCertFile, eventconfig.Config.TLS.TLSMqttPrivateKeyFile)
+		if err != nil {
+			klog.Errorf("Failed to load x509 key pair: %v", err)
+			return nil
+		}
+
+		caCert, err := ioutil.ReadFile(eventconfig.Config.TLS.TLSMqttCAFile)
+		if err != nil {
+			klog.Errorf("Failed to read TLSMqttCAFile")
+			return nil
+		}
+
+		pool := x509.NewCertPool()
+		if ok := pool.AppendCertsFromPEM(caCert); !ok {
+			klog.Errorf("Cannot parse the certificates")
+			return nil
+		}
+
+		tlsConfig = &tls.Config{
+			RootCAs:            pool,
+			Certificates:       []tls.Certificate{cert},
+			InsecureSkipVerify: false,
+		}
+	} else {
+		tlsConfig = &tls.Config{InsecureSkipVerify: true, ClientAuth: tls.NoClientCert}
+	}
 	opts.SetTLSConfig(tlsConfig)
+	klog.V(4).Infof("set TLS configuration for MQTT client successfully")
+
 	return opts
 }
 
 // LoopConnect connect to mqtt server
 func LoopConnect(clientID string, client MQTT.Client) {
 	for {
-		log.LOGGER.Infof("start connect to mqtt server with client id: %s", clientID)
+		klog.Infof("start connect to mqtt server with client id: %s", clientID)
 		token := client.Connect()
-		log.LOGGER.Infof("client %s isconnected: %s", clientID, client.IsConnected())
+		klog.Infof("client %s isconnected: %v", clientID, client.IsConnected())
 		if rs, err := CheckClientToken(token); !rs {
-			log.LOGGER.Errorf("connect error: %v", err)
+			klog.Errorf("connect error: %v", err)
 		} else {
 			return
 		}

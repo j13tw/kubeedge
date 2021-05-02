@@ -1,9 +1,9 @@
 package dtmodule
 
 import (
-	"strings"
+	"k8s.io/klog/v2"
 
-	"github.com/kubeedge/beehive/pkg/common/log"
+	"github.com/kubeedge/kubeedge/edge/pkg/devicetwin/dtcommon"
 	"github.com/kubeedge/kubeedge/edge/pkg/devicetwin/dtcontext"
 	"github.com/kubeedge/kubeedge/edge/pkg/devicetwin/dtmanager"
 )
@@ -16,35 +16,47 @@ type DTModule struct {
 
 // InitWorker init worker
 func (dm *DTModule) InitWorker(recv chan interface{}, confirm chan interface{}, heartBeat chan interface{}, dtContext *dtcontext.DTContext) {
-
-	if strings.Compare(dm.Name, "MemModule") == 0 {
+	switch dm.Name {
+	case dtcommon.MemModule:
 		dm.Worker = dtmanager.MemWorker{
-			Group: "MemModule",
-			Worker: dtmanager.Worker{ReceiverChan: recv,
+			Group: dtcommon.MemModule,
+			Worker: dtmanager.Worker{
+				ReceiverChan:  recv,
 				ConfirmChan:   confirm,
 				HeartBeatChan: heartBeat,
-				DTContexts:    dtContext}}
-	} else if strings.Compare(dm.Name, "TwinModule") == 0 {
+				DTContexts:    dtContext,
+			},
+		}
+	case dtcommon.TwinModule:
 		dm.Worker = dtmanager.TwinWorker{
-			Group: "TwinModule",
-			Worker: dtmanager.Worker{ReceiverChan: recv,
+			Group: dtcommon.TwinModule,
+			Worker: dtmanager.Worker{
+				ReceiverChan:  recv,
 				ConfirmChan:   confirm,
 				HeartBeatChan: heartBeat,
-				DTContexts:    dtContext}}
-	} else if strings.Compare(dm.Name, "DeviceModule") == 0 {
+				DTContexts:    dtContext,
+			},
+		}
+	case dtcommon.DeviceModule:
 		dm.Worker = dtmanager.DeviceWorker{
-			Group: "DeviceModule",
-			Worker: dtmanager.Worker{ReceiverChan: recv,
+			Group: dtcommon.DeviceModule,
+			Worker: dtmanager.Worker{
+				ReceiverChan:  recv,
 				ConfirmChan:   confirm,
 				HeartBeatChan: heartBeat,
-				DTContexts:    dtContext}}
-	} else if strings.Compare(dm.Name, "CommModule") == 0 {
+				DTContexts:    dtContext,
+			},
+		}
+	case dtcommon.CommModule:
 		dm.Worker = dtmanager.CommWorker{
-			Group: "CommModule",
-			Worker: dtmanager.Worker{ReceiverChan: recv,
+			Group: dtcommon.CommModule,
+			Worker: dtmanager.Worker{
+				ReceiverChan:  recv,
 				ConfirmChan:   confirm,
 				HeartBeatChan: heartBeat,
-				DTContexts:    dtContext}}
+				DTContexts:    dtContext,
+			},
+		}
 	}
 }
 
@@ -52,7 +64,7 @@ func (dm *DTModule) InitWorker(recv chan interface{}, confirm chan interface{}, 
 func (dm DTModule) Start() {
 	defer func() {
 		if err := recover(); err != nil {
-			log.LOGGER.Infof("%s in twin panic", dm.Name)
+			klog.Infof("%s in twin panic", dm.Name)
 		}
 	}()
 	dm.Worker.Start()

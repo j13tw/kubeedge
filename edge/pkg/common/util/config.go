@@ -22,68 +22,12 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"io/ioutil"
 	"math/big"
 	"os"
-	"path"
-	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/ServiceComb/go-archaius/sources/file-source"
-	"github.com/kubeedge/beehive/pkg/common/config"
-	"gopkg.in/yaml.v2"
+	certutil "k8s.io/client-go/util/cert"
 )
-
-// LoadConfig is function to Load Configurations from a specified location. If no location is specified it loads the config from the default location
-func LoadConfig(confLocation ...string) error {
-	err := config.CONFIG.DeInit()
-	if err != nil {
-		return err
-	}
-	fSource := filesource.NewYamlConfigurationSource()
-	if len(confLocation) == 0 {
-		confLocation = []string{os.Getenv("GOPATH") + "/src/github.com/kubeedge/kubeedge/edge/conf"}
-	}
-	err = filepath.Walk(confLocation[0], func(location string, f os.FileInfo, err error) error {
-		if f == nil {
-			return err
-		}
-		if f.IsDir() {
-			return nil
-		}
-		ext := strings.ToLower(path.Ext(location))
-		if ext == ".yml" || ext == ".yaml" {
-			fSource.AddFileSource(location, 0)
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	config.CONFIG.AddSource(fSource)
-	return nil
-}
-
-//GenerateTestYaml is a function is used to create a temporary file to be used for testing
-//It accepts 3 arguments:"test" is the interface used to generate the YAML,
-// "path" is the directory path at which the directory is to be created,
-// "filename" is the name of the file to be created without the ".yaml" extension
-func GenerateTestYaml(test interface{}, path, filename string) error {
-	data, err := yaml.Marshal(test)
-	if err != nil {
-		return err
-	}
-	err = os.MkdirAll(path, 0777)
-	if err != nil {
-		return err
-	}
-	err = ioutil.WriteFile(path+"/"+filename+".yaml", data, 0777)
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
 //GenerateTestCertificate generates fake certificates and stores them at the path specified.
 //It accepts 3 arguments path, certFileName and keyFileName
@@ -99,6 +43,7 @@ func GenerateTestCertificate(path string, certFileName string, keyFileName strin
 			Country:      []string{"test"},
 			Organization: []string{"testor"},
 		},
+		DNSNames:    []string{"localhost"},
 		NotBefore:   time.Now(),
 		NotAfter:    time.Now().AddDate(5, 5, 5),
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
@@ -122,7 +67,7 @@ func GenerateTestCertificate(path string, certFileName string, keyFileName strin
 	}
 	pKey := x509.MarshalPKCS1PrivateKey(privateKey)
 	certFilePEM := pem.Block{
-		Type:  "CERTIFICATE",
+		Type:  certutil.CertificateBlockType,
 		Bytes: cert}
 	err = createPEMfile(path+certFileName+".crt", certFilePEM)
 	if err != nil {

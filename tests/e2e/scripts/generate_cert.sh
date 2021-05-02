@@ -51,9 +51,13 @@ echo "---------------------------------------------"
 
 #Generate temparory folder in Edge and Cloud folders to copy certs
 sudo mkdir -p $GOPATH/src/github.com/kubeedge/kubeedge/edge/tmp
-sudo mkdir -p $GOPATH/src/github.com/kubeedge/kubeedge/cloud/edgecontroller/tmp
+sudo mkdir -p $GOPATH/src/github.com/kubeedge/kubeedge/cloud/tmp
 #Copy the generated certs to respective paths
-sudo cp -r rootCA.crt rootCA.key kubeedge.crt kubeedge.key $GOPATH/src/github.com/kubeedge/kubeedge/edge/tmp
-sudo cp -r rootCA.crt rootCA.key kubeedge.crt kubeedge.key $GOPATH/src/github.com/kubeedge/kubeedge/cloud/edgecontroller/tmp
+mkdir -p /tmp/edgecore
+mkdir -p /tmp/cloudcore
+mkdir -p /tmp/edgesite
+
+sudo cp -r rootCA.crt rootCA.key kubeedge.crt kubeedge.key /tmp/edgecore
+sudo cp -r rootCA.crt rootCA.key kubeedge.crt kubeedge.key /tmp/cloudcore
 
 echo "-----Certificate are Copied to Edge and Cloud Nodes-----"

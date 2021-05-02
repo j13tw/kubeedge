@@ -2,31 +2,34 @@ package wsclient
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
-	"github.com/kubeedge/beehive/pkg/common/log"
+	"k8s.io/klog/v2"
+
 	"github.com/kubeedge/beehive/pkg/core/model"
+	"github.com/kubeedge/kubeedge/edge/pkg/edgehub/config"
+	"github.com/kubeedge/viaduct/pkg/api"
+	wsclient "github.com/kubeedge/viaduct/pkg/client"
+	"github.com/kubeedge/viaduct/pkg/conn"
 )
 
 const (
 	retryCount       = 5
-	cloudAccessSleep = 60 * time.Second
+	cloudAccessSleep = 5 * time.Second
 )
 
-//WebSocketClient defines websocket client object
+// WebSocketClient a websocket client
 type WebSocketClient struct {
-	webConn  *websocket.Conn
-	sendLock sync.Mutex
-	config   *WebSocketConfig
+	config     *WebSocketConfig
+	connection conn.Connection
 }
 
-//WebSocketConfig defines configuration object
+// WebSocketConfig config for websocket
 type WebSocketConfig struct {
 	URL              string
 	CertFilePath     string
@@ -34,86 +37,89 @@ type WebSocketConfig struct {
 	HandshakeTimeout time.Duration
 	ReadDeadline     time.Duration
 	WriteDeadline    time.Duration
-	ExtendHeader     http.Header
+	NodeID           string
+	ProjectID        string
 }
 
-//NewWebSocketClient returns a new web socket client object with its configuration
+// NewWebSocketClient initializes a new websocket client instance
 func NewWebSocketClient(conf *WebSocketConfig) *WebSocketClient {
 	return &WebSocketClient{config: conf}
 }
 
 // Init initializes websocket client
-func (wcc *WebSocketClient) Init() error {
-	log.LOGGER.Infof("start to connect Access")
-	cert, err := tls.LoadX509KeyPair(wcc.config.CertFilePath, wcc.config.KeyFilePath)
+func (wsc *WebSocketClient) Init() error {
+	klog.Infof("Websocket start to connect Access")
+	cert, err := tls.LoadX509KeyPair(wsc.config.CertFilePath, wsc.config.KeyFilePath)
 	if err != nil {
-		log.LOGGER.Errorf("failed to load x509 key pair: %v", err)
+		klog.Errorf("Failed to load x509 key pair: %v", err)
 		return fmt.Errorf("failed to load x509 key pair, error: %v", err)
 	}
 
-	dialer := &websocket.Dialer{
-		TLSClientConfig: &tls.Config{
-			Certificates:       []tls.Certificate{cert},
-			InsecureSkipVerify: true,
-		},
-		HandshakeTimeout: wcc.config.HandshakeTimeout,
+	caCert, err := ioutil.ReadFile(config.Config.TLSCAFile)
+	if err != nil {
+		return err
 	}
 
+	pool := x509.NewCertPool()
+	if ok := pool.AppendCertsFromPEM(caCert); !ok {
+		return fmt.Errorf("cannot parse the certificates")
+	}
+
+	tlsConfig := &tls.Config{
+		RootCAs:            pool,
+		Certificates:       []tls.Certificate{cert},
+		InsecureSkipVerify: false,
+	}
+
+	option := wsclient.Options{
+		HandshakeTimeout: wsc.config.HandshakeTimeout,
+		TLSConfig:        tlsConfig,
+		Type:             api.ProtocolTypeWS,
+		Addr:             wsc.config.URL,
+		AutoRoute:        false,
+		ConnUse:          api.UseTypeMessage,
+	}
+	exOpts := api.WSClientOption{Header: make(http.Header)}
+	exOpts.Header.Set("node_id", wsc.config.NodeID)
+	exOpts.Header.Set("project_id", wsc.config.ProjectID)
+	client := &wsclient.Client{Options: option, ExOpts: exOpts}
+
 	for i := 0; i < retryCount; i++ {
-		conn, resp, err := dialer.Dial(wcc.config.URL, wcc.config.ExtendHeader)
+		connection, err := client.Connect()
 		if err != nil {
-			var respMsg string
-			if resp != nil {
-				body, rErr := ioutil.ReadAll(resp.Body)
-				if rErr == nil {
-					respMsg = fmt.Sprintf(", response code: %d, response body: %s", resp.StatusCode, string(body))
-				} else {
-					respMsg = fmt.Sprintf(", response code: %d", resp.StatusCode)
-				}
-				resp.Body.Close()
-			}
-			log.LOGGER.Errorf("error when init websocket connection%s: %v", respMsg, err)
+			klog.Errorf("Init websocket connection failed %s", err.Error())
 		} else {
-			log.LOGGER.Infof("success to connect Access")
-			wcc.webConn = conn
+			wsc.connection = connection
+			klog.Infof("Websocket connect to cloud access successful")
 			return nil
 		}
 		time.Sleep(cloudAccessSleep)
 	}
-	return errors.New("max retry count to connect Access")
+	return errors.New("max retry count reached when connecting to cloud")
 }
 
-//Uninit closes the web socket connection
-func (wcc *WebSocketClient) Uninit() {
-	wcc.webConn.Close()
+//UnInit closes the websocket connection
+func (wsc *WebSocketClient) UnInit() {
+	wsc.connection.Close()
 }
 
 //Send sends the message as JSON object through the connection
-func (wcc *WebSocketClient) Send(message model.Message) error {
-	deadline := time.Now().Add(wcc.config.WriteDeadline)
-	wcc.sendLock.Lock()
-	defer wcc.sendLock.Unlock()
-	wcc.webConn.SetWriteDeadline(deadline)
-
-	return wcc.webConn.WriteJSON(message)
+func (wsc *WebSocketClient) Send(message model.Message) error {
+	err := wsc.connection.SetWriteDeadline(time.Now().Add(wsc.config.WriteDeadline))
+	if err != nil {
+		return err
+	}
+	return wsc.connection.WriteMessageAsync(&message)
 }
 
-//Receive reads the JSON object through the connection
-func (wcc *WebSocketClient) Receive() (model.Message, error) {
-	var message model.Message
-
-	//deadline := time.Now().Add(wcc.config.ReadDeadline)
-	//wcc.webConn.SetReadDeadline(deadline)
-	err := wcc.webConn.ReadJSON(&message)
-	if err != nil {
-		log.LOGGER.Errorf("failed to read json: %v", err)
-		return model.Message{}, fmt.Errorf("failed to read json, error: %v", err)
-	}
-
-	return message, nil
+//Receive reads the binary message through the connection
+func (wsc *WebSocketClient) Receive() (model.Message, error) {
+	message := model.Message{}
+	err := wsc.connection.ReadMessage(&message)
+	return message, err
 }
 
 //Notify logs info
-func (wcc *WebSocketClient) Notify(authInfo map[string]string) {
-	log.LOGGER.Infof("don't care")
+func (wsc *WebSocketClient) Notify(authInfo map[string]string) {
+	klog.Infof("no op")
 }

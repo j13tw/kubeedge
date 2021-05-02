@@ -1,4 +1,4 @@
-// +build !linux,!windows
+// +build !linux,!windows,!dockerless
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -19,11 +19,10 @@ limitations under the License.
 package dockershim
 
 import (
+	"context"
 	"fmt"
 
-	"golang.org/x/net/context"
-
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // ImageFsInfo returns information of the filesystem that is used to store images.

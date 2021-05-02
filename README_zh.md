@@ -1,7 +1,7 @@
 # KubeEdge
 [![Build Status](https://travis-ci.org/kubeedge/kubeedge.svg?branch=master)](https://travis-ci.org/kubeedge/kubeedge)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubeedge/kubeedge)](https://goreportcard.com/report/github.com/kubeedge/kubeedge)
-[![LICENSE](https://img.shields.io/github/license/kubeedge/kubeedge.svg?style=flat-square)](https://github.com/kubeedge/kubeedge/blob/master/LICENSE)
+[![LICENSE](https://img.shields.io/github/license/kubeedge/kubeedge.svg?style=flat-square)](/LICENSE)
 [![Releases](https://img.shields.io/github/release/kubeedge/kubeedge/all.svg?style=flat-square)](https://github.com/kubeedge/kubeedge/releases)
 [![Documentation Status](https://readthedocs.org/projects/kubeedge/badge/?version=latest)](https://kubeedge.readthedocs.io/en/latest/?badge=latest)
 
@@ -9,6 +9,9 @@
 ![logo](./docs/images/KubeEdge_logo.png)
 
 KubeEdge 是一个开源的系统，可将本机容器化应用编排和管理扩展到边缘端设备。 它基于Kubernetes构建，为网络和应用程序提供核心基础架构支持，并在云端和边缘端部署应用，同步元数据。KubeEdge 还支持 **MQTT** 协议，允许开发人员编写客户逻辑，并在边缘端启用设备通信的资源约束。KubeEdge 包含云端和边缘端两部分。
+
+注意：
+1.3以前的版本不再支持，请尝试升级到支持版本。
 
 ## 优势
 
@@ -32,392 +35,93 @@ KubeEdge 是一个开源的系统，可将本机容器化应用编排和管理�
 
 KubeEdge 由以下组件构成:
 
-- **Edged:** Edged 是运行在边缘节点的代理，用于管理容器化的应用程序。
-- **EdgeHub:** EdgeHub 是一个 Web Socket 客户端，负责与边缘计算的云服务（例如 KubeEdge 架构图中的 Edge Controller）交互，包括同步云端资源更新、报告边缘主机和设备状态变化到云端等功能。
-- **CloudHub:** CloudHub 是一个 Web Socket 服务端，负责监听云端的变化, 缓存并发送消息到 EdgeHub。
-- **EdgeController:** EdgeController 是一个扩展的 Kubernetes 控制器，管理边缘节点和 Pods 的元数据确保数据能够传递到指定的边缘节点。
-- **EventBus:** EventBus 是一个与 MQTT 服务器（mosquitto）交互的 MQTT 客户端，为其他组件提供订阅和发布功能。
-- **DeviceTwin:** DeviceTwin 负责存储设备状态并将设备状态同步到云，它还为应用程序提供查询接口。
-- **MetaManager:** MetaManager 是消息处理器，位于 Edged 和 Edgehub 之间，它负责向轻量级数据库（SQLite）存储/检索元数据。
+### 云上部分
+- [CloudHub](https://kubeedge.io/en/docs/architecture/cloud/cloudhub): CloudHub 是一个 Web Socket 服务端，负责监听云端的变化, 缓存并发送消息到 EdgeHub。
+- [EdgeController](https://kubeedge.io/en/docs/architecture/cloud/edge_controller): EdgeController 是一个扩展的 Kubernetes 控制器，管理边缘节点和 Pods 的元数据确保数据能够传递到指定的边缘节点。
+- [DeviceController](https://kubeedge.io/en/docs/architecture/cloud/device_controller): DeviceController 是一个扩展的 Kubernetes 控制器，管理边缘设备，确保设备信息、设备状态的云边同步。
+
+
+### 边缘部分
+- [EdgeHub](https://kubeedge.io/en/docs/architecture/edge/edgehub): EdgeHub 是一个 Web Socket 客户端，负责与边缘计算的云服务（例如 KubeEdge 架构图中的 Edge Controller）交互，包括同步云端资源更新、报告边缘主机和设备状态变化到云端等功能。
+- [Edged](https://kubeedge.io/en/docs/architecture/edge/edged): Edged 是运行在边缘节点的代理，用于管理容器化的应用程序。
+- [EventBus](https://kubeedge.io/en/docs/architecture/edge/eventbus): EventBus 是一个与 MQTT 服务器（mosquitto）交互的 MQTT 客户端，为其他组件提供订阅和发布功能。
+- [ServiceBus](https://kubeedge.io/en/docs/architecture/edge/servicebus): ServiceBus是一个运行在边缘的HTTP客户端，接受来自云上服务的请求，与运行在边缘端的HTTP服务器交互，提供了云上服务通过HTTP协议访问边缘端HTTP服务器的能力。
+- [DeviceTwin](https://kubeedge.io/en/docs/architecture/edge/devicetwin): DeviceTwin 负责存储设备状态并将设备状态同步到云，它还为应用程序提供查询接口。
+- [MetaManager](https://kubeedge.io/en/docs/architecture/edge/metamanager): MetaManager 是消息处理器，位于 Edged 和 Edgehub 之间，它负责向轻量级数据库（SQLite）存储/检索元数据。
+
 
 ### 架构
 
 ![架构图](docs/images/kubeedge_arch.png)
 
-## 路线图
+## 兼容性
 
-### Release 1.0
+### Kubernetes 版本兼容
 
-KubeEdge将为 IoT / Edge 工作负载提供基础架构和基本功能。其中包括：
+|                     | Kubernetes 1.13 | Kubernetes 1.14 | Kubernetes 1.15 | Kubernetes 1.16 | Kubernetes 1.17 | Kubernetes 1.18 | Kubernetes 1.19 |
+|---------------------|-----------------|-----------------|-----------------|-----------------|-----------------|-----------------|-----------------|
+| KubeEdge 1.3        | ✓               | ✓              | ✓               | ✓               | ✓               | ✓               | ✓              |
+| KubeEdge 1.4        | ✓               | ✓              | ✓               | ✓               | ✓              | ✓               | ✓               |
+| KubeEdge 1.5        | ✓               | ✓              | ✓               | ✓               | ✓              | ✓               | ✓               |
+| KubeEdge HEAD       | ✓               | ✓              | ✓               | ✓               | ✓              | ✓               | ✓               |
 
-- 云端和边缘端的开源实现。
-- 使用 Kubernetes kubectl 从云端向边缘节点部署应用。
-- 使用 Kubernetes kubectl 从云端对边缘节点的应用进行配置管理和密钥管理。
-- 云和边缘节点之间的双向和多路网络通信。
-- Kubernetes Pod 和 Node 状态通过云端 kubectl 查询，从边缘端收集/报告数据。
-- 边缘节点在脱机时自动恢复，并重新连接云端。
-- 支持IoT设备通过Device twin 和 MQTT 协议与边缘节点通信。
+说明:
+* `✓` KubeEdge和Kubernetes的版本是完全兼容的
+* `+` KubeEdge中有些特性或API对象可能在对应的Kubernetes版本中不存在
+* `-` Kubernetes中有些特性或API对象可能在对应的KubeEdge版本中不可用
 
-### Release 2.0 和未来计划
+### Golang 版本依赖
 
-- 使用 KubeEdge 和 Istio 构建服务网格。
-- 提高 Kubedge 基础设施的性能和可靠性。
-- 在边缘端提供函数即服务（Function as a Service，FaaS）。
-- 在边缘端节点支持更多类型的设备协议，如 AMQP、BlueTooth、ZigBee 等等。
-- 评估并启用具有数千个边缘节点和数百万设备的超大规模边缘集群。
-- 启用应用的智能调度，扩大边缘节点的规模。
+|                         | Golang 1.11     | Golang 1.12     | Golang 1.13     | Golang 1.14     |
+|-------------------------|-----------------|-----------------|-----------------|-----------------|
+| KubeEdge 1.2            | ✗               | ✓               | ✓               | ✓               |
+| KubeEdge 1.3            | ✗               | ✓               | ✓               | ✓               |
+| KubeEdge 1.4            | ✗               | ✗               | ✗               | ✓               |
+| KubeEdge HEAD (master)  | ✗               | ✗               | ✗               | ✓               |
 
 ## 使用
 
-### 先决条件
+* [快速部署](https://kubeedge.io/en/docs/setup/keadm)
 
-要使用 KubeEdge 您需要同时在云端和边缘端安装 **docker**。如果没有，请按照以下步骤安装 docker。
+## 路线图
 
-#### 安装 docker
+* [2020 Q2 Roadmap](./docs/roadmap_zh.md#2020-q2-roadmap)
 
-Ubuntu系统：
+## 社区例会
 
-```shell
-# Install Docker from Ubuntu's repositories:
-apt-get update
-apt-get install -y docker.io
+例会时间：
+- 欧洲时间：**北京时间 周三 16:30-17:30** (每双周一次，从2020年2月19日开始)。
+([查询本地时间](https://www.thetimezoneconverter.com/?t=16%3A30&tz=GMT%2B8&))
+- 太平洋时间：**北京时间 周三 10:00-11:00** (每双周一次，从2020年2月26日开始)。
+([查询本地时间](https://www.thetimezoneconverter.com/?t=10%3A00&tz=GMT%2B8&))
 
-# or install Docker CE 18.06 from Docker's repositories for Ubuntu or Debian:
-apt-get update && apt-get install apt-transport-https ca-certificates curl software-properties-common
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-add-apt-repository \
-   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-   $(lsb_release -cs) \
-   stable"
-apt-get update && apt-get install docker-ce=18.06.0~ce~3-0~ubuntu
-```
-
-CentOS系统：
-
-```shell
-# Install Docker from CentOS/RHEL repository:
-yum install -y docker
-
-# or install Docker CE 18.06 from Docker's CentOS repositories:
-yum install yum-utils device-mapper-persistent-data lvm2
-yum-config-manager \
-    --add-repo \
-    https://download.docker.com/linux/centos/docker-ce.repo
-yum update && yum install docker-ce-18.06.1.ce
-```
-
-KubeEdge 云端部分（edgecontroller）连接到 Kubernetes master 节点以同步节点和 pod 状态的更新。如果没有安装 Kubernetes，请按照以下步骤使用 kubeadm 安装 Kubernetes。
-
-#### 安装 kubeadm/kubectl
-
-Ubuntu系统：
-
-```shell
-apt-get update && apt-get install -y apt-transport-https curl
-curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-cat <<EOF >/etc/apt/sources.list.d/kubernetes.list
-deb https://apt.kubernetes.io/ kubernetes-xenial main
-EOF
-apt-get update
-apt-get install -y kubelet kubeadm kubectl
-apt-mark hold kubelet kubeadm kubectl
-```
-
-CentOS系统：
-
-```shell
-cat <<EOF > /etc/yum.repos.d/kubernetes.repo
-[kubernetes]
-name=Kubernetes
-baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
-exclude=kube*
-EOF
-
-# Set SELinux in permissive mode (effectively disabling it)
-setenforce 0
-sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
-
-yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
-
-systemctl enable --now kubelet
-```
-
-#### 安装 Kubernetes
-
-初始化 Kubernetes master, 需要如下步骤:
-
-```shell
-kubeadm init
-```
-
-要使用 Kubernetes 命令行工具 **kubectl**, 您需要完成如下配置。
-
-```shell
-mkdir -p $HOME/.kube
-cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-chown $(id -u):$(id -g) $HOME/.kube/config
-```
-
-在完成 Kubernetes master 的初始化后， 我们需要暴露 Kubernetes apiserver 的 http 端口8080用于与 edgecontroller/kubectl 交互。请按照以下步骤在 Kubernetes apiserver 中启用 http 端口。
-
-```shell
-vi /etc/kubernetes/manifests/kube-apiserver.yaml
-# Add the following flags in spec: containers: -command section
-- --insecure-port=8080
-- --insecure-bind-address=0.0.0.0
-```
-
-KubeEdge 的边缘部分在 deviceTwin 和设备之间使用 MQTT 进行通信。KubeEdge 支持3个 MQTT 模式：
-1) internalMqttMode: 启用内部  mqtt 代理。
-2) bothMqttMode: 同时启用内部和外部代理。
-3) externalMqttMode: 仅启用外部代理。
-
-可以使用 [edge.yaml](https://github.com/kubeedge/kubeedge/blob/master/edge/conf/edge.yaml#L4) 中的 mode 字段去配置期望的模式。
-
-使用 KubeEdge 的 mqtt 内部或外部模式，您都需要确保在边缘节点上安装 **mosquitto**。如果没有，请参考下面的步骤安装。
-
-#### 安装 mosquitto
-
-Ubuntu系统：
-
-```shell
-apt install mosquitto
-```
-
-CentOS系统：
-
-```shell
-yum install mosquitto
-```
-
-参考 [mosquitto official website](https://mosquitto.org/download/) 获得更多的信息。
-
-KubeEdge 在云和边缘之间基于证书进行身份验证/授权。证书可以使用 openssl 生成。请按照以下步骤生成证书。
-
-#### 安装 openssl
-
-如果 openssl 不存在，请使用下面的命令安装 openssl。
-
-```shell
-apt-get install openssl
-```
-
-#### 生成证书
-
-安装 KubeEdge 需要 RootCA 证书以及证书/密钥对。相同的证书/密钥对可以同时用于云端和边缘端。
-
-```shell
-# Generete Root Key
-openssl genrsa -des3 -out rootCA.key 4096
-# Generate Root Certificate
-openssl req -x509 -new -nodes -key rootCA.key -sha256 -days 1024 -out rootCA.crt
-# Generate Key
-openssl genrsa -out edge.key 2048
-# Generate csr, Fill required details after running the command
-openssl req -new -key edge.key -out edge.csr
-# Generate Certificate
-openssl x509 -req -in edge.csr -CA rootCA.crt -CAkey rootCA.key -CAcreateserial -out edge.crt -days 500 -sha256 
-```
-
-### 克隆 KubeEdge
-
-克隆 KubeEdge
-
-```shell
-git clone https://github.com/kubeedge/kubeedge.git $GOPATH/src/github.com/kubeedge/kubeedge
-cd $GOPATH/src/github.com/kubeedge/kubeedge
-```
-
-### 构建 Cloud
-
-```shell
-cd $GOPATH/src/github.com/kubeedge/kubeedge/cloud/edgecontroller
-make # or `make edgecontroller`
-```
-
-### 构建 Edge
-
-```shell
-cd $GOPATH/src/github.com/kubeedge/kubeedge/edge
-make # or `make edge_core`
-```
-
-KubeEdge 可以跨平台编译，运行在基于ARM的处理器上。
-请点击 [Cross Compilation](docs/setup/cross-compilation.md) 获得相关说明。
-
-## 运行 KubeEdge
-
-### 运行 Cloud
-
-#### 以 k8s deployment 方式运行
-
-此方式将部署 cloud 端到 k8s 集群，所以需要登录到 k8s 的 master 节点上（或者其他可以用 `kubectl` 操作集群的机器）。
-
-存放在 `github.com/kubeedge/kubeedge/build/cloud` 里的各个编排文件和脚本会被用到。所以需要先将这些文件放到可以用 kubectl 操作的地方。
-
-首先， 确保 k8s 集群可以拉到 edge controller 镜像。如果没有， 可以构建一个，然后推到集群能拉到的 registry 上。
-
-```bash
-make cloudimage
-```
-
-然后，需要生成 tls 证书。这步成功的话，会生成 `06-secret.yaml`。
-
-```bash
-../tools/certgen.sh buildSecret | tee ./06-secret.yaml
-```
-
-接着，按照编排文件的文件名顺序创建各个 k8s 资源。在创建之前，应该检查每个编排文件内容，以确保符合特定的集群环境。
-
-```bash
-for resource in $(ls *.yaml); do kubectl create -f $resource; done
-```
-
-最后，基于`08-service.yaml.example`，创建一个适用于你集群环境的 service，
-将 cloud hub 暴露到集群外，让 edge core 能够连到。
-
-
-#### 以二进制文件方式运行
-
-+ 修改 `$GOPATH/src/github.com/kubeedge/kubeedge/cloud/edgecontroller/conf/controller.yaml` 配置文件，将 `cloudhub.ca`、`cloudhub.cert`、`cloudhub.key`修改为生成的证书路径
-
-```shell
-cd $GOPATH/src/github.com/kubeedge/kubeedge/cloud/edgecontroller
-# run edge controller
-# `conf/` should be in the same directory as the cloned KubeEdge repository
-# verify the configurations before running cloud(edgecontroller)
-./edgecontroller
-```
-
-### 运行 Edge
-
-我们提供了一个示例 node.json 来在 Kubernetes 中添加一个节点。
-请确保在 Kubernetes 中添加了边缘节点 edge-node。运行以下步骤以添加边缘节点 edge-node。
-
-+ 编译 `$GOPATH/src/github.com/kubeedge/kubeedge/build/node.json` 文件，将 `metadata.name` 修改为edge node的IP
-+ 部署node
-    ```shell
-    kubectl apply -f $GOPATH/src/github.com/kubeedge/kubeedge/build/node.json
-    ```
-
-修改`$GOPATH/src/github.com/kubeedge/kubeedge/edge/conf/edge.yaml`配置文件
-  + 将 `edgehub.websocket.certfile` 和 `edgehub.websocket.keyfile` 替换为自己的证书路径
-  + 将 `edgehub.websocket.url` 中的 `0.0.0.0` 修改为 master edge 的IP
-  + 用 edge node 的IP替换 yaml文件中的 `fb4eb70-2783-42b8-b3f-63e2fd6d242e`
-
-运行 Edge
-
-#### 以容器方式运行
-
-此方式将在容器中运行 edge 端，所以需要确认 docker engine 监听在
-`/var/run/docker.sock`，这个之后需要挂载到容器中。
-
-在启动 edge 端容器之前，需要检查一下这个脚本的内容 `build/edge/run_daemon.sh`，
-确保符合具体的环境。（这个脚本会生成 EdgeHub 的客户端证书，建议用生成 CloudHub
-端证书时使用的相同的 CA 证书）
-
-如果没有 edge core 镜像，可以自行构建一个：
-
-```bash
-make edgeimage
-```
-
-之后，运行脚本，mqtt broker url 作为第一个参数，cloud hub url 作为第二个参数，
-第三个参数可选，可以用来指定 edge core 镜像的 tag，如果不指定，默认是 'latest'，
-例如：
-
-```bash
-./run_daemon.sh \
-tcp://<mqtt-broker-address>:1883 \
-wss://<cloud-hub-address>:10000/e632aba927ea4ac2b575ec1603d56f10/fb4ebb70-2783-42b8-b3ef-63e2fd6d242e/events
-```
-
-#### 以二进制文件方式运行
-
-```shell
-# run mosquitto
-mosquitto -d -p 1883
-
-# run edge_core
-# `conf/` should be in the same directory as the cloned KubeEdge repository
-# verify the configurations before running edge(edge_core)
-./edge_core
-# or
-nohup ./edge_core > edge_core.log 2>&1 &
-```
-
-在 Cloud 和 Edge 被启动之后, 您能通过如下的命令去检查边缘节点的状态。
-
-```shell
-kubectl get nodes
-```
-
-请确保您创建的边缘节点状态是 **ready**。
-
-如果您使用华为云 IEF, 那么您创建的边缘节点应该正在运行（可在 IEF 控制台页面中查看）。
-
-### 部署应用
-
-请按照以下步骤部署应用程序示例。
-
-```shell
-kubectl apply -f $GOPATH/src/github.com/kubeedge/kubeedge/build/deployment.yaml
-```
-
-**提示：** 目前对于边缘端，必须在 Pod 配置中使用 hostPort，不然 Pod 会一直处于 ContainerCreating 状态。 hostPort 必须等于 containerPort 而且不能为 0。
-
-然后可以使用下面的命令检查应用程序是否正常运行。
-
-```shell
-kubectl get pods
-```
-
-### 运行 Edge 单元测试
-
- ```shell
- make edge_test
- ```
-
- 单独运行包的单元测试。
-
- ```shell
- export GOARCHAIUS_CONFIG_PATH=$GOPATH/src/github.com/kubeedge/kubeedge/edge
- cd <path to package to be tested>
- go test -v
- ```
-
-### 运行 Edge 集成测试
-
-```shell
-make edge_integration_test
-```
-
-### 集成测试框架的详细信息和用例
-
-请单击链接 [link](https://github.com/kubeedge/kubeedge/tree/master/edge/test/integration) 找到 KubeEdge 集成测试框架的详细信息和用例。
-
-## 社区
-
-**Slack channel:** 
-
-用户可以通过单击邀请链接 [link](https://join.slack.com/t/kubeedge/shared_invite/enQtNDg1MjAwMDI0MTgyLTQ1NzliNzYwNWU5MWYxOTdmNDZjZjI2YWE2NDRlYjdiZGYxZGUwYzkzZWI2NGZjZWRkZDVlZDQwZWI0MzM1Yzc) 加入此频道。
+会议资源：
+- [会议纪要和议程](https://docs.google.com/document/d/1Sr5QS_Z04uPfRbA7PrXr3aPwCRpx7EtsyHq7mp6CnHs/edit)
+- [会议视频记录](https://www.youtube.com/playlist?list=PLQtlO1kVWGXkRGkjSrLGEPJODoPb8s5FM)
+- [会议链接](https://zoom.us/j/4167237304)
+- [会议日历](https://calendar.google.com/calendar/embed?src=8rjk8o516vfte21qibvlae3lj4%40group.calendar.google.com) | [订阅日历](https://calendar.google.com/calendar?cid=OHJqazhvNTE2dmZ0ZTIxcWlidmxhZTNsajRAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ)
 
 ## 文档
 
-通过该链接 [https://docs.kubeedge.io](https://docs.kubeedge.io) 可用找到有关 KubeEdge 的各个模块的详细信息。
-一些说明 KubeEdge 平台的使用案例的示例应用程序和演示可以在当前仓库 [this](https://github.com/kubeedge/examples) 中找到。
+从此[文档](https://kubeedge.io/en/docs)开始你的KubeEdge之旅！
+访问[https://docs.kubeedge.io](https://docs.kubeedge.io) 获得更多详细信息。
+一些说明 KubeEdge 平台的使用案例的示例应用程序和演示可以在[这个仓库](https://github.com/kubeedge/examples) 中找到。
 
 ## 支持
 
-<!--
-如果您需要支持，请从 [故障排除指南] 开始，然后按照我们概述的流程进行操作。
--->
+如果您需要支持，请从 [故障排除指南](https://kubeedge.io/en/docs/developer/troubleshooting) 开始，然后按照我们概述的流程进行操作。
+
 如果您有任何疑问，请以下方式与我们联系：
 
 - [mailing list](https://groups.google.com/forum/#!forum/kubeedge)
+- [slack](https://join.slack.com/t/kubeedge/shared_invite/enQtNjc0MTg2NTg2MTk0LWJmOTBmOGRkZWNhMTVkNGU1ZjkwNDY4MTY4YTAwNDAyMjRkMjdlMjIzYmMxODY1NGZjYzc4MWM5YmIxZjU1ZDI)
+- [twitter](https://twitter.com/kubeedge)
 
-- [slack](https://kubeedge.slack.com)
+## 贡献
+
+如果您有兴趣成为一个贡献者，也想参与到KubeEdge的代码开发中，
+请查看[CONTRIBUTING](./CONTRIBUTING.md)获取更多关于如何提交Patch和贡献的流程。
+
+## 许可证
+
+KubeEdge基于Apache 2.0许可证，查看[LICENSE](./LICENSE)获取更多信息。

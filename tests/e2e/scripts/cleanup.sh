@@ -14,31 +14,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-kill_edge_core() {
-   sudo pkill edge_core
-    #kill the edge_core process if it exists.
-    sleep 5s
-    if pgrep edge_core >/dev/null
-    then
-        echo "Failed to kill edge_core process !!"
-        exit 1
-    else
-        echo "edge_core is successfully killed !!"
+setuptype=$1
+
+kill_component() {
+    local component=$1
+    if pgrep "$component" &>/dev/null; then
+        # edgesite process is found, kill the process.
+        sudo pkill $component &>/dev/null
+        if [[ "$?" == "0" ]]; then
+            echo "$component is successfully killed !!"
+        else
+            echo "Failed to kill $component process !!"
+            exit 1
+        fi
     fi
 }
 
-kill_edgecontroller() {
-    sudo pkill edge
-    #kill the edgecontroller process if it exists.
-    sleep 5s
-    if pgrep edgecontroller >/dev/null
-    then
-        echo "Failed to kill the edgecontroller !!"
-        exit 1
-    else
-        echo "edgecontroller is successfully killed !!"
-    fi
+kill_all_components() {
+    local components="cloudcore edgecore edgesite"
+    for component in $components; do
+        kill_component "$component"
+    done
 }
 
-kill_edge_core
-kill_edgecontroller
+cleanup_files(){
+    sudo rm -rf /tmp/etc/kubeedge /tmp/var/lib/kubeedge
+    sudo rm -f tests/e2e/config.json
+    find -name "*.test" | xargs sudo rm -f
+}
+
+kill_all_components
+
+cleanup_files

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,10 +26,13 @@ import (
 )
 
 // ClusterRoleLister helps list ClusterRoles.
+// All objects returned here must be treated as read-only.
 type ClusterRoleLister interface {
 	// List lists all ClusterRoles in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterRole, err error)
 	// Get retrieves the ClusterRole from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ClusterRole, error)
 	ClusterRoleListerExpansion
 }

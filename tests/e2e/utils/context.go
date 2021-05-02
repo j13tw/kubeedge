@@ -16,6 +16,7 @@ limitations under the License.
 package utils
 
 import (
+	"crypto/tls"
 	"io"
 	"net/http"
 	"net/url"
@@ -29,39 +30,43 @@ type TestContext struct {
 	Cfg Config
 }
 
-//function to get the testcontext Object.
+//NewTestContext function to build testcontext with provided config.
 func NewTestContext(cfg Config) *TestContext {
 	return &TestContext{
 		Cfg: cfg,
 	}
 }
 
-//Function to prepare the http req and send
-func SendHttpRequest(method, reqApi string) (error, *http.Response) {
+//SendHTTPRequest Function to prepare the http req and send
+func SendHTTPRequest(method, reqAPI string) (*http.Response, error) {
 	var body io.Reader
 	var resp *http.Response
 
-	client := &http.Client{}
-	req, err := http.NewRequest(method, reqApi, body)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{
+		Transport: tr,
+	}
+	req, err := http.NewRequest(method, reqAPI, body)
 	if err != nil {
 		// handle error
-		Failf("Frame HTTP request failed: %v", err)
-		return err, resp
+		Fatalf("Frame HTTP request failed: %v", err)
+		return resp, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	t := time.Now()
 	resp, err = client.Do(req)
-	InfoV6("%s %s %v in %v", req.Method, req.URL, resp.Status, time.Now().Sub(t))
 	if err != nil {
 		// handle error
-		Failf("HTTP request is failed :%v", err)
-		return err, resp
+		Fatalf("HTTP request is failed :%v", err)
+		return resp, err
 	}
-
-	return nil, resp
+	Infof("%s %s %v in %v", req.Method, req.URL, resp.Status, time.Since(t))
+	return resp, nil
 }
 
-//function add label selector
+//MapLabels function add label selector
 func MapLabels(ls map[string]string) string {
 	selector := make([]string, 0, len(ls))
 	for key, value := range ls {

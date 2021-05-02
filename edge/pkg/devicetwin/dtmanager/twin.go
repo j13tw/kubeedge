@@ -5,10 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/kubeedge/beehive/pkg/common/log"
+	"k8s.io/klog/v2"
+
 	"github.com/kubeedge/beehive/pkg/core/model"
+	messagepkg "github.com/kubeedge/kubeedge/edge/pkg/common/message"
 	"github.com/kubeedge/kubeedge/edge/pkg/common/modules"
 	"github.com/kubeedge/kubeedge/edge/pkg/devicetwin/dtclient"
 	"github.com/kubeedge/kubeedge/edge/pkg/devicetwin/dtcommon"
@@ -27,13 +30,16 @@ const (
 	SyncTwinDeleteDealType = 3
 	//DealActual deal actual
 	DealActual = 1
-	//DealExpected deal exepected
+	//DealExpected deal expected
 	DealExpected = 0
+
+	stringType = "string"
 )
 
 var (
 	//twinActionCallBack map for action to callback
-	twinActionCallBack map[string]CallBack
+	twinActionCallBack         map[string]CallBack
+	initTwinActionCallBackOnce sync.Once
 )
 
 //TwinWorker deal twin event
@@ -55,10 +61,10 @@ func (tw TwinWorker) Start() {
 				if fn, exist := twinActionCallBack[dtMsg.Action]; exist {
 					_, err := fn(tw.DTContexts, dtMsg.Identity, dtMsg.Msg)
 					if err != nil {
-						log.LOGGER.Errorf("TwinModule deal %s event failed", dtMsg.Action)
+						klog.Errorf("TwinModule deal %s event failed", dtMsg.Action)
 					}
 				} else {
-					log.LOGGER.Errorf("TwinModule deal %s event failed, not found callback", dtMsg.Action)
+					klog.Errorf("TwinModule deal %s event failed, not found callback", dtMsg.Action)
 				}
 			}
 
@@ -74,14 +80,16 @@ func (tw TwinWorker) Start() {
 }
 
 func initTwinActionCallBack() {
-	twinActionCallBack = make(map[string]CallBack)
-	twinActionCallBack[dtcommon.TwinUpdate] = dealTwinUpdate
-	twinActionCallBack[dtcommon.TwinGet] = dealTwinGet
-	twinActionCallBack[dtcommon.TwinCloudSync] = dealTwinSync
+	initTwinActionCallBackOnce.Do(func() {
+		twinActionCallBack = make(map[string]CallBack)
+		twinActionCallBack[dtcommon.TwinUpdate] = dealTwinUpdate
+		twinActionCallBack[dtcommon.TwinGet] = dealTwinGet
+		twinActionCallBack[dtcommon.TwinCloudSync] = dealTwinSync
+	})
 }
 
 func dealTwinSync(context *dtcontext.DTContext, resource string, msg interface{}) (interface{}, error) {
-	log.LOGGER.Infof("Twin Sync EVENT")
+	klog.Infof("Twin Sync EVENT")
 	message, ok := msg.(*model.Message)
 	if !ok {
 		return nil, errors.New("msg not Message type")
@@ -94,12 +102,12 @@ func dealTwinSync(context *dtcontext.DTContext, resource string, msg interface{}
 
 	msgTwin, err := dttype.UnmarshalDeviceTwinUpdate(content)
 	if err != nil {
-		log.LOGGER.Errorf("Unmarshal update request body failed, err: %#v", err)
+		klog.Errorf("Unmarshal update request body failed, err: %#v", err)
 		dealUpdateResult(context, "", "", dtcommon.BadRequestCode, errors.New("Unmarshal update request body failed, Please check the request"), result)
 		return nil, err
 	}
 
-	log.LOGGER.Infof("Begin to update twin of the device %s", resource)
+	klog.Infof("Begin to update twin of the device %s", resource)
 	eventID := msgTwin.EventID
 	context.Lock(resource)
 	DealDeviceTwin(context, resource, eventID, msgTwin.Twin, SyncDealType)
@@ -109,7 +117,7 @@ func dealTwinSync(context *dtcontext.DTContext, resource string, msg interface{}
 }
 
 func dealTwinGet(context *dtcontext.DTContext, resource string, msg interface{}) (interface{}, error) {
-	log.LOGGER.Infof("Twin Get EVENT")
+	klog.Infof("Twin Get EVENT")
 	message, ok := msg.(*model.Message)
 	if !ok {
 		return nil, errors.New("msg not Message type")
@@ -125,7 +133,7 @@ func dealTwinGet(context *dtcontext.DTContext, resource string, msg interface{})
 }
 
 func dealTwinUpdate(context *dtcontext.DTContext, resource string, msg interface{}) (interface{}, error) {
-	log.LOGGER.Infof("Twin Update EVENT")
+	klog.Infof("Twin Update EVENT")
 	message, ok := msg.(*model.Message)
 	if !ok {
 		return nil, errors.New("msg not Message type")
@@ -147,31 +155,31 @@ func Updated(context *dtcontext.DTContext, deviceID string, payload []byte) {
 	result := []byte("")
 	msg, err := dttype.UnmarshalDeviceTwinUpdate(payload)
 	if err != nil {
-		log.LOGGER.Errorf("Unmarshal update request body failed, err: %#v", err)
+		klog.Errorf("Unmarshal update request body failed, err: %#v", err)
 		dealUpdateResult(context, "", "", dtcommon.BadRequestCode, err, result)
 		return
 	}
-	log.LOGGER.Infof("Begin to update twin of the device %s", deviceID)
+	klog.Infof("Begin to update twin of the device %s", deviceID)
 	eventID := msg.EventID
 	DealDeviceTwin(context, deviceID, eventID, msg.Twin, RestDealType)
 }
 
 //DealDeviceTwin deal device twin
 func DealDeviceTwin(context *dtcontext.DTContext, deviceID string, eventID string, msgTwin map[string]*dttype.MsgTwin, dealType int) error {
-	log.LOGGER.Infof("Begin to deal device twin of the device %s", deviceID)
+	klog.Infof("Begin to deal device twin of the device %s", deviceID)
 	now := time.Now().UnixNano() / 1e6
 	result := []byte("")
-	deviceModel, isExist := context.GetDevice(deviceID)
+	device, isExist := context.GetDevice(deviceID)
 	if !isExist {
-		log.LOGGER.Errorf("Update twin rejected due to the device %s is not existed", deviceID)
+		klog.Errorf("Update twin rejected due to the device %s is not existed", deviceID)
 		dealUpdateResult(context, deviceID, eventID, dtcommon.NotFoundCode, errors.New("Update rejected due to the device is not existed"), result)
 		return errors.New("Update rejected due to the device is not existed")
 	}
 	content := msgTwin
 	var err error
 	if content == nil {
-		log.LOGGER.Errorf("Update twin of device %s error, the update request body not have key:twin", deviceID)
-		err = errors.New("Update twin error, the update request body not have key:twin")
+		klog.Errorf("Update twin of device %s error, key:twin does not exist", deviceID)
+		err = dttype.ErrorUpdate
 		dealUpdateResult(context, deviceID, eventID, dtcommon.BadRequestCode, err, result)
 		return err
 	}
@@ -195,7 +203,7 @@ func DealDeviceTwin(context *dtcontext.DTContext, deviceID string, eventID strin
 		}
 		if err != nil {
 			SyncDeviceFromSqlite(context, deviceID)
-			log.LOGGER.Errorf("Update device twin failed due to writing sql error: %v", err)
+			klog.Errorf("Update device twin failed due to writing sql error: %v", err)
 		}
 	}
 
@@ -212,7 +220,7 @@ func DealDeviceTwin(context *dtcontext.DTContext, deviceID string, eventID strin
 		dealDocument(context, deviceID, dttype.BaseMessage{EventID: eventID, Timestamp: now}, dealTwinResult.Document)
 	}
 
-	delta, ok := dttype.BuildDeviceTwinDelta(dttype.BuildBaseMessage(), deviceModel.Twin)
+	delta, ok := dttype.BuildDeviceTwinDelta(dttype.BuildBaseMessage(), device.Twin)
 	if ok {
 		dealDelta(context, deviceID, delta)
 	}
@@ -223,9 +231,9 @@ func DealDeviceTwin(context *dtcontext.DTContext, deviceID string, eventID strin
 	return nil
 }
 
-//dealUpdateResutl build update result and send result, if success send the current state
+//dealUpdateResult build update result and send result, if success send the current state
 func dealUpdateResult(context *dtcontext.DTContext, deviceID string, eventID string, code int, err error, payload []byte) error {
-	log.LOGGER.Infof("Deal update result of device %s: Build and send result", deviceID)
+	klog.Infof("Deal update result of device %s: Build and send result", deviceID)
 
 	topic := dtcommon.DeviceETPrefix + deviceID + dtcommon.TwinETUpdateResultSuffix
 	reason := ""
@@ -241,79 +249,76 @@ func dealUpdateResult(context *dtcontext.DTContext, deviceID string, eventID str
 		para.Reason = err.Error()
 		result, jsonErr = dttype.BuildErrorResult(para)
 		if jsonErr != nil {
-			log.LOGGER.Errorf("Unmarshal error result of device %s error, err: %v", deviceID, jsonErr)
+			klog.Errorf("Unmarshal error result of device %s error, err: %v", deviceID, jsonErr)
 			return jsonErr
 		}
 	}
-	log.LOGGER.Infof("Deal update result of device %s: send result", deviceID)
+	klog.Infof("Deal update result of device %s: send result", deviceID)
 	return context.Send("",
 		dtcommon.SendToEdge,
 		dtcommon.CommModule,
-		context.BuildModelMessage(modules.BusGroup, "", topic, "publish", result))
+		context.BuildModelMessage(modules.BusGroup, "", topic, messagepkg.OperationPublish, result))
 }
 
 // dealDelta  send delta
 func dealDelta(context *dtcontext.DTContext, deviceID string, payload []byte) error {
 	topic := dtcommon.DeviceETPrefix + deviceID + dtcommon.TwinETDeltaSuffix
-	log.LOGGER.Infof("Deal delta of device %s: send delta", deviceID)
+	klog.Infof("Deal delta of device %s: send delta", deviceID)
 	return context.Send("",
 		dtcommon.SendToEdge,
 		dtcommon.CommModule,
-		context.BuildModelMessage(modules.BusGroup, "", topic, "publish", payload))
+		context.BuildModelMessage(modules.BusGroup, "", topic, messagepkg.OperationPublish, payload))
 }
 
 // dealSyncResult build and send sync result, is delta update
 func dealSyncResult(context *dtcontext.DTContext, deviceID string, baseMessage dttype.BaseMessage, twin map[string]*dttype.MsgTwin) error {
-
-	log.LOGGER.Infof("Deal sync result of device %s: sync with cloud", deviceID)
+	klog.Infof("Deal sync result of device %s: sync with cloud", deviceID)
 	resource := "device/" + deviceID + "/twin/edge_updated"
 	return context.Send("",
 		dtcommon.SendToCloud,
 		dtcommon.CommModule,
-		context.BuildModelMessage("resource", "", resource, "update", dttype.DeviceTwinResult{BaseMessage: baseMessage, Twin: twin}))
+		context.BuildModelMessage("resource", "", resource, model.UpdateOperation, dttype.DeviceTwinResult{BaseMessage: baseMessage, Twin: twin}))
 }
 
 //dealDocument build document and save current state as last state, update sqlite
 func dealDocument(context *dtcontext.DTContext, deviceID string, baseMessage dttype.BaseMessage, twinDocument map[string]*dttype.TwinDoc) error {
-
-	log.LOGGER.Infof("Deal document of devcie %s: build and send document", deviceID)
+	klog.Infof("Deal document of device %s: build and send document", deviceID)
 	payload, _ := dttype.BuildDeviceTwinDocument(baseMessage, twinDocument)
 	topic := dtcommon.DeviceETPrefix + deviceID + dtcommon.TwinETDocumentSuffix
-	log.LOGGER.Infof("Deal document of devcie %s: send document", deviceID)
+	klog.Infof("Deal document of device %s: send document", deviceID)
 	return context.Send("",
 		dtcommon.SendToEdge,
 		dtcommon.CommModule,
-		context.BuildModelMessage(modules.BusGroup, "", topic, "publish", payload))
+		context.BuildModelMessage(modules.BusGroup, "", topic, messagepkg.OperationPublish, payload))
 }
 
 // DealGetTwin deal get twin event
 func DealGetTwin(context *dtcontext.DTContext, deviceID string, payload []byte) error {
-
-	log.LOGGER.Info("Deal the event of getting twin")
+	klog.Info("Deal the event of getting twin")
 	msg := []byte("")
 	para := dttype.Parameter{}
 	edgeGet, err := dttype.UnmarshalBaseMessage(payload)
 	if err != nil {
-		log.LOGGER.Errorf("Unmarshal twin info %s failed , err: %#v", string(payload), err)
+		klog.Errorf("Unmarshal twin info %s failed , err: %#v", string(payload), err)
 		para.Code = dtcommon.BadRequestCode
 		para.Reason = fmt.Sprintf("Unmarshal twin info %s failed , err: %#v", string(payload), err)
 		var jsonErr error
 		msg, jsonErr = dttype.BuildErrorResult(para)
 		if jsonErr != nil {
-			log.LOGGER.Errorf("Unmarshal error result error, err: %v", jsonErr)
+			klog.Errorf("Unmarshal error result error, err: %v", jsonErr)
 			return jsonErr
 		}
 	} else {
 		para.EventID = edgeGet.EventID
 		doc, exist := context.GetDevice(deviceID)
 		if !exist {
-			log.LOGGER.Errorf("Device %s not found while getting twin", deviceID)
+			klog.Errorf("Device %s not found while getting twin", deviceID)
 			para.Code = dtcommon.NotFoundCode
 			para.Reason = fmt.Sprintf("Device %s not found while getting twin", deviceID)
 			var jsonErr error
 			msg, jsonErr = dttype.BuildErrorResult(para)
 			if jsonErr != nil {
-				log.LOGGER.Errorf("Unmarshal error result error, err: %v", jsonErr)
+				klog.Errorf("Unmarshal error result error, err: %v", jsonErr)
 				return jsonErr
 			}
 		} else {
@@ -321,24 +326,24 @@ func DealGetTwin(context *dtcontext.DTContext, deviceID string, payload []byte) 
 			var err error
 			msg, err = dttype.BuildDeviceTwinResult(dttype.BaseMessage{EventID: edgeGet.EventID, Timestamp: now}, doc.Twin, RestDealType)
 			if err != nil {
-				log.LOGGER.Errorf("Build state while deal get twin err: %#v", err)
+				klog.Errorf("Build state while deal get twin err: %#v", err)
 				para.Code = dtcommon.InternalErrorCode
 				para.Reason = fmt.Sprintf("Build state while deal get twin err: %#v", err)
 				var jsonErr error
 				msg, jsonErr = dttype.BuildErrorResult(para)
 				if jsonErr != nil {
-					log.LOGGER.Errorf("Unmarshal error result error, err: %v", jsonErr)
+					klog.Errorf("Unmarshal error result error, err: %v", jsonErr)
 					return jsonErr
 				}
 			}
 		}
 	}
 	topic := dtcommon.DeviceETPrefix + deviceID + dtcommon.TwinETGetResultSuffix
-	log.LOGGER.Infof("Deal the event of getting twin of device %s: send result ", deviceID)
+	klog.Infof("Deal the event of getting twin of device %s: send result ", deviceID)
 	return context.Send("",
 		dtcommon.SendToEdge,
 		dtcommon.CommModule,
-		context.BuildModelMessage(modules.BusGroup, "", topic, "publish", msg))
+		context.BuildModelMessage(modules.BusGroup, "", topic, messagepkg.OperationPublish, msg))
 }
 
 //dealtype 0:update ,2:cloud_update,1:detail result,3:deleted
@@ -481,7 +486,6 @@ func dealTwinDelete(returnResult *dttype.DealTwinResult, deviceID string, key st
 	} else {
 		delete(document, key)
 		delete(syncResult, key)
-
 	}
 
 	return nil
@@ -504,7 +508,7 @@ func isTwinValueDiff(twin *dttype.MsgTwin, msgTwin *dttype.MsgTwin, dealType int
 	if msgTwinValue != nil {
 		hasMsgTwin = true
 	}
-	valueType := "string"
+	valueType := stringType
 	if strings.Compare(twin.Metadata.Type, "deleted") == 0 {
 		if msgTwin.Metadata != nil {
 			valueType = msgTwin.Metadata.Type
@@ -514,7 +518,6 @@ func isTwinValueDiff(twin *dttype.MsgTwin, msgTwin *dttype.MsgTwin, dealType int
 	}
 	if hasMsgTwin {
 		if hasTwin {
-
 			err := dtcommon.ValidateValue(valueType, *msgTwinValue.Value)
 			if err != nil {
 				return false, err
@@ -527,7 +530,7 @@ func isTwinValueDiff(twin *dttype.MsgTwin, msgTwin *dttype.MsgTwin, dealType int
 }
 
 func dealTwinCompare(returnResult *dttype.DealTwinResult, deviceID string, key string, twin *dttype.MsgTwin, msgTwin *dttype.MsgTwin, dealType int) error {
-	log.LOGGER.Info("dealtwincompare")
+	klog.Info("dealtwincompare")
 	now := time.Now().UnixNano() / 1e6
 
 	document := returnResult.Document
@@ -701,13 +704,12 @@ func dealTwinCompare(returnResult *dttype.DealTwinResult, deviceID string, key s
 			}
 		} else {
 			if strings.Compare(twin.Metadata.Type, "deleted") == 0 {
-				twin.Metadata = &dttype.TypeMetadata{Type: "string"}
-				cols["attr_type"] = "string"
+				twin.Metadata = &dttype.TypeMetadata{Type: stringType}
+				cols["attr_type"] = stringType
 				syncResult[key].Metadata = twin.Metadata
 				isChange = true
 			}
 		}
-
 	}
 	if isChange {
 		update = append(update, dtclient.DeviceTwinUpdate{DeviceID: deviceID, Name: key, Cols: cols})
@@ -727,7 +729,6 @@ func dealTwinCompare(returnResult *dttype.DealTwinResult, deviceID string, key s
 				delete(syncResult, key)
 			}
 		}
-
 	} else {
 		if dealType == RestDealType {
 			delete(document, key)
@@ -740,7 +741,6 @@ func dealTwinCompare(returnResult *dttype.DealTwinResult, deviceID string, key s
 				delete(syncResult, key)
 			}
 		}
-
 	}
 	return nil
 }
@@ -787,7 +787,7 @@ func dealTwinAdd(returnResult *dttype.DealTwinResult, deviceID string, key strin
 			return nil
 		}
 		// value type default string
-		valueType := "string"
+		valueType := stringType
 		if msgTwin.Metadata != nil {
 			valueType = msgTwin.Metadata.Type
 		}
@@ -827,7 +827,7 @@ func dealTwinAdd(returnResult *dttype.DealTwinResult, deviceID string, key strin
 			}
 			return nil
 		}
-		valueType := "string"
+		valueType := stringType
 		if msgTwin.Metadata != nil {
 			valueType = msgTwin.Metadata.Type
 		}
@@ -871,7 +871,7 @@ func dealTwinAdd(returnResult *dttype.DealTwinResult, deviceID string, key strin
 		msgTwin.Metadata.Type = deviceTwin.AttrType
 		isChange = true
 	} else {
-		deviceTwin.AttrType = "string"
+		deviceTwin.AttrType = stringType
 		isChange = true
 	}
 
@@ -898,14 +898,12 @@ func dealTwinAdd(returnResult *dttype.DealTwinResult, deviceID string, key strin
 		} else {
 			delete(syncResult, key)
 		}
-
 	} else {
 		delete(document, key)
 		delete(syncResult, key)
 	}
 
 	return nil
-
 }
 
 //DealMsgTwin get diff while updating twin
@@ -924,9 +922,9 @@ func DealMsgTwin(context *dtcontext.DTContext, deviceID string, msgTwins map[str
 		Document:   document,
 		Err:        nil}
 
-	deviceModel, ok := context.GetDevice(deviceID)
+	device, ok := context.GetDevice(deviceID)
 	if !ok {
-		log.LOGGER.Errorf("invalid device id")
+		klog.Errorf("invalid device id")
 		return dttype.DealTwinResult{Add: add,
 			Delete:     deletes,
 			Update:     update,
@@ -936,17 +934,17 @@ func DealMsgTwin(context *dtcontext.DTContext, deviceID string, msgTwins map[str
 			Err:        errors.New("invalid device id")}
 	}
 
-	twins := deviceModel.Twin
+	twins := device.Twin
 	if twins == nil {
-		deviceModel.Twin = make(map[string]*dttype.MsgTwin)
-		twins = deviceModel.Twin
+		device.Twin = make(map[string]*dttype.MsgTwin)
+		twins = device.Twin
 	}
 
 	var err error
 	for key, msgTwin := range msgTwins {
 		if twin, exist := twins[key]; exist {
 			if dealType >= 1 && msgTwin != nil && (msgTwin.Metadata == nil) {
-				log.LOGGER.Infof("Not found metadata of twin")
+				klog.Infof("Not found metadata of twin")
 			}
 			if msgTwin == nil && dealType == 0 || dealType >= 1 && strings.Compare(msgTwin.Metadata.Type, "deleted") == 0 {
 				err = dealTwinDelete(&returnResult, deviceID, key, twin, msgTwin, dealType)
@@ -964,10 +962,8 @@ func DealMsgTwin(context *dtcontext.DTContext, deviceID string, msgTwins map[str
 			if err != nil {
 				return returnResult
 			}
-
 		}
-
 	}
-	context.DeviceList.Store(deviceID, deviceModel)
+	context.DeviceList.Store(deviceID, device)
 	return returnResult
 }

@@ -23,11 +23,30 @@ import (
 	"time"
 )
 
+type vmSpec struct {
+	IP       string `json:"ip"`
+	Username string `json:"username"`
+	Passwd   string `json:"password"`
+}
+
 //config.json decode struct
 type Config struct {
-	EdgedEndpoint string   `json:"edgedEndpoint"`
-	AppImageUrl   []string `json:"image_url"`
-	ApiServer     string   `json:"apiserver"`
+	AppImageURL                    []string          `json:"image_url"`
+	K8SMasterForKubeEdge           string            `json:"k8smasterforkubeedge"`
+	Nodes                          map[string]vmSpec `json:"k8snodes"`
+	NumOfNodes                     int               `json:"node_num"`
+	ImageRepo                      string            `json:"imagerepo"`
+	K8SMasterForProvisionEdgeNodes string            `json:"k8smasterforprovisionedgenodes"`
+	CloudImageURL                  string            `json:"cloudimageurl"`
+	EdgeImageURL                   string            `json:"edgeimageurl"`
+	Namespace                      string            `json:"namespace"`
+	ControllerStubPort             int               `json:"controllerstubport"`
+	Protocol                       string            `json:"protocol"`
+	DockerHubUserName              string            `json:"dockerhubusername"`
+	DockerHubPassword              string            `json:"dockerhubpassword"`
+	MqttEndpoint                   string            `json:"mqttendpoint"`
+	KubeConfigPath                 string            `json:"kubeconfigpath"`
+	Token                          string            `json:"token"`
 }
 
 //config struct
@@ -36,17 +55,17 @@ var config *Config
 //get config.json path
 func LoadConfig() Config {
 	if config == nil {
-		config = loadConfigJsonFromPath()
+		config = loadConfigJSOMFromPath()
 	}
 	return *config
 }
 
-//Load Config.json from the PWD, and decode the config.
-func loadConfigJsonFromPath() *Config {
+//loadConfigJSOMFromPath reads the test configuration and builds a Config object.
+func loadConfigJSOMFromPath() *Config {
 	path := getConfigPath()
 	_, err := filepath.Abs(filepath.Dir(path))
 	if err != nil {
-		InfoV6("Failed to get Abs path: %v", err)
+		Infof("Failed to get Abs path: %v", err)
 		panic(err)
 	}
 	var config *Config = &Config{}
@@ -62,7 +81,8 @@ func loadConfigJsonFromPath() *Config {
 	return config
 }
 
-//Get config path from Env or hard code the file path
+//getConfigPath returns the configuration path provided in the env var name. In case the env var is not
+//set, the default configuration path is returned
 func getConfigPath() string {
 	path := os.Getenv("TESTCONFIG")
 	if path == "" {

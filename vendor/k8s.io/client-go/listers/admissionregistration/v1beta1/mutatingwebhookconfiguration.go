@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,10 +26,13 @@ import (
 )
 
 // MutatingWebhookConfigurationLister helps list MutatingWebhookConfigurations.
+// All objects returned here must be treated as read-only.
 type MutatingWebhookConfigurationLister interface {
 	// List lists all MutatingWebhookConfigurations in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta1.MutatingWebhookConfiguration, err error)
 	// Get retrieves the MutatingWebhookConfiguration from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1beta1.MutatingWebhookConfiguration, error)
 	MutatingWebhookConfigurationListerExpansion
 }

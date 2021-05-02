@@ -21,23 +21,23 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/kubeedge/kubeedge/edge/pkg/devicetwin/dtcommon"
-	"github.com/kubeedge/kubeedge/edge/pkg/devicetwin/dttype"
-	"github.com/kubeedge/kubeedge/edge/test/integration/utils/common"
-	. "github.com/kubeedge/kubeedge/edge/test/integration/utils/helpers"
-
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	_ "github.com/mattn/go-sqlite3"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/kubeedge/kubeedge/edge/pkg/devicetwin/dtcommon"
+	"github.com/kubeedge/kubeedge/edge/pkg/devicetwin/dttype"
+	"github.com/kubeedge/kubeedge/edge/test/integration/utils/common"
+	. "github.com/kubeedge/kubeedge/edge/test/integration/utils/helpers"
 )
 
 //Devicestate from subscribed MQTT topic
 var DeviceState string
 
 type DeviceUpdates struct {
-	EventId     string `json:"event_id"`
-	Timestamp   int    `json:"timestamp"`
+	EventID     string `json:"event_id"`
+	Timestamp   int64  `json:"timestamp"`
 	DeviceField `json:"device"`
 }
 
@@ -62,7 +62,6 @@ type BaseMessage struct {
 
 var MemDeviceUpdate *MembershipUpdate
 
-
 var TokenClient Token
 var ClientOpts *MQTT.ClientOptions
 var Client MQTT.Client
@@ -74,22 +73,21 @@ func SubMessageReceived(client MQTT.Client, message MQTT.Message) {
 		devicePayload := (message.Payload())
 		err := json.Unmarshal(devicePayload, &deviceState)
 		if err != nil {
-			common.Failf("Unmarshall failed %s", err)
+			common.Fatalf("Unmarshall failed %s", err)
 		}
 	}
 	DeviceState = deviceState.State
 }
 func DeviceSubscribed(client MQTT.Client, message MQTT.Message) {
-	topic := dtcommon.MemETPrefix + ctx.Cfg.NodeId + dtcommon.MemETUpdateSuffix
+	topic := dtcommon.MemETPrefix + ctx.Cfg.NodeID + dtcommon.MemETUpdateSuffix
 	if message.Topic() == topic {
 		devicePayload := (message.Payload())
 		err := json.Unmarshal(devicePayload, MemDeviceUpdate)
 		if err != nil {
-			common.Failf("Unmarshall failed %s", err)
+			common.Fatalf("Unmarshall failed %s", err)
 		}
 	}
 }
-
 
 // Deviceid from the DB and assigning to it
 var DeviceIDN string
@@ -106,7 +104,7 @@ var _ = Describe("Event Bus Testing", func() {
 			ClientOpts = HubClientInit(ctx.Cfg.MqttEndpoint, ClientID, "", "")
 			Client = MQTT.NewClient(ClientOpts)
 			if TokenClient = Client.Connect(); TokenClient.Wait() && TokenClient.Error() != nil {
-				common.Failf("client.Connect() Error is %s", TokenClient.Error())
+				common.Fatalf("client.Connect() Error is %s", TokenClient.Error())
 			}
 		})
 		AfterEach(func() {
@@ -114,73 +112,73 @@ var _ = Describe("Event Bus Testing", func() {
 			common.PrintTestcaseNameandStatus()
 		})
 		It("TC_TEST_EBUS_1: Sending data to Cloud", func() {
-			var data ="messagetoUpload_record_to_cloud"
+			var data = "messagetoUpload_record_to_cloud"
 			body, err := json.Marshal(data)
 			if err != nil {
-				common.Failf("Marshal failed %v", err)
+				common.Fatalf("Marshal failed %v", err)
 			}
 			if TokenClient = Client.Publish(UploadRecordToCloud, 0, false, body); TokenClient.Wait() && TokenClient.Error() != nil {
-				common.Failf("client.Publish() Error is %s", TokenClient.Error())
+				common.Fatalf("client.Publish() Error is %s", TokenClient.Error())
 			} else {
-				common.InfoV6("client.Publish Success !!")
+				common.Infof("client.Publish Success !!")
 			}
 			Expect(TokenClient.Error()).NotTo(HaveOccurred())
 
 		})
 
 		It("TC_TEST_EBUS_2: Sending data to device module", func() {
-			var data ="messagetoDevice_status_update"
+			var data = "messagetoDevice_status_update"
 			body, err := json.Marshal(data)
 			if err != nil {
-				common.Failf("Marshal failed %v", err)
+				common.Fatalf("Marshal failed %v", err)
 			}
 			if TokenClient = Client.Publish(DevicestatusUpdate, 0, false, body); TokenClient.Wait() && TokenClient.Error() != nil {
-				common.Failf("client.Publish() Error is %s", TokenClient.Error())
+				common.Fatalf("client.Publish() Error is %s", TokenClient.Error())
 			} else {
-				common.InfoV6("client.Publish Success !!")
+				common.Infof("client.Publish Success !!")
 			}
 			Expect(TokenClient.Error()).NotTo(HaveOccurred())
 			//Client.Disconnect(1)
 		})
 
 		It("TC_TEST_EBUS_3: Sending data to device twin module", func() {
-			var data ="messagetoDevice_Twin_update"
+			var data = "messagetoDevice_Twin_update"
 			body, err := json.Marshal(data)
 			if err != nil {
-				common.Failf("Marshal failed %v", err)
+				common.Fatalf("Marshal failed %v", err)
 			}
 			if TokenClient = Client.Publish(DeviceTwinUpdate, 0, false, body); TokenClient.Wait() && TokenClient.Error() != nil {
-				common.Failf("client.Publish() Error is %s", TokenClient.Error())
+				common.Fatalf("client.Publish() Error is %s", TokenClient.Error())
 			} else {
-				common.InfoV6("client.Publish Success !!")
+				common.Infof("client.Publish Success !!")
 			}
 			Expect(TokenClient.Error()).NotTo(HaveOccurred())
 		})
 
 		It("TC_TEST_EBUS_4: Sending data to membership module", func() {
-			var data ="messagetoDevice_Membership_update"
+			var data = "messagetoDevice_Membership_update"
 			body, err := json.Marshal(data)
 			if err != nil {
-				common.Failf("Marshal failed %v", err)
+				common.Fatalf("Marshal failed %v", err)
 			}
 			if TokenClient = Client.Publish(DeviceMembershipUpdate, 0, false, body); TokenClient.Wait() && TokenClient.Error() != nil {
-				common.Failf("client.Publish() Error is %s", TokenClient.Error())
+				common.Fatalf("client.Publish() Error is %s", TokenClient.Error())
 			} else {
-				common.InfoV6("client.Publish Success !!")
+				common.Infof("client.Publish Success !!")
 			}
 			Expect(TokenClient.Error()).NotTo(HaveOccurred())
 		})
 
 		It("TC_TEST_EBUS_5: Sending data to device module", func() {
-			var data ="messagetoDevice_upload"
+			var data = "messagetoDevice_upload"
 			body, err := json.Marshal(data)
 			if err != nil {
-				common.Failf("Marshal failed %v", err)
+				common.Fatalf("Marshal failed %v", err)
 			}
 			if TokenClient = Client.Publish(DeviceUpload, 0, false, body); TokenClient.Wait() && TokenClient.Error() != nil {
-				common.Failf("client.Publish() Error is %s", TokenClient.Error())
+				common.Fatalf("client.Publish() Error is %s", TokenClient.Error())
 			} else {
-				common.InfoV6("client.Publish Success !!")
+				common.Infof("client.Publish Success !!")
 			}
 			Expect(TokenClient.Error()).NotTo(HaveOccurred())
 		})
@@ -188,7 +186,7 @@ var _ = Describe("Event Bus Testing", func() {
 
 	Context("Publish on eventbus topics throgh MQTT internal broker", func() {
 		BeforeEach(func() {
-			common.InfoV2("Adding Mock device to edgenode !!")
+			common.Infof("Adding Mock device to edgenode !!")
 
 			DeviceIDN = GenerateDeviceID("kubeedge-device-")
 			DeviceN = CreateDevice(DeviceIDN, "edgedevice", "unknown")
@@ -196,19 +194,19 @@ var _ = Describe("Event Bus Testing", func() {
 			ClientOpts = HubClientInit(ctx.Cfg.MqttEndpoint, ClientID, "", "")
 			Client = MQTT.NewClient(ClientOpts)
 			if TokenClient = Client.Connect(); TokenClient.Wait() && TokenClient.Error() != nil {
-				common.Failf("client.Connect() Error is %s", TokenClient.Error())
+				common.Fatalf("client.Connect() Error is %s", TokenClient.Error())
 			}
 			Expect(TokenClient.Error()).NotTo(HaveOccurred())
-			devicetopic := dtcommon.MemETPrefix + ctx.Cfg.NodeId + dtcommon.MemETUpdateSuffix
+			devicetopic := dtcommon.MemETPrefix + ctx.Cfg.NodeID + dtcommon.MemETUpdateSuffix
 			topic := dtcommon.DeviceETPrefix + DeviceIDN + dtcommon.DeviceETStateUpdateSuffix + "/result"
 			Token := Client.Subscribe(devicetopic, 0, DeviceSubscribed)
-			if Token.Wait() && TokenClient.Error() != nil{
-				common.Failf("Subscribe to Topic  Failed  %s, %s", TokenClient.Error(), topic)
+			if Token.Wait() && TokenClient.Error() != nil {
+				common.Fatalf("Subscribe to Topic  Failed  %s, %s", TokenClient.Error(), topic)
 			}
 
 			Token = Client.Subscribe(topic, 0, SubMessageReceived)
-			if Token.Wait() && TokenClient.Error() != nil{
-				common.Failf("Subscribe to Topic  Failed  %s, %s", TokenClient.Error(), devicetopic)
+			if Token.Wait() && TokenClient.Error() != nil {
+				common.Fatalf("Subscribe to Topic  Failed  %s, %s", TokenClient.Error(), devicetopic)
 			}
 			IsDeviceAdded := HandleAddAndDeleteDevice(http.MethodPut, ctx.Cfg.TestManager+Devicehandler, DeviceN)
 			Expect(IsDeviceAdded).Should(BeTrue())
@@ -224,7 +222,7 @@ var _ = Describe("Event Bus Testing", func() {
 			topic := dtcommon.DeviceETPrefix + DeviceIDN + dtcommon.DeviceETStateUpdateSuffix + "/result"
 			body, err := json.Marshal(message)
 			if err != nil {
-				common.Failf("Marshal failed %v", err)
+				common.Fatalf("Marshal failed %v", err)
 			}
 			Eventually(func() string {
 				var ID string
@@ -232,9 +230,9 @@ var _ = Describe("Event Bus Testing", func() {
 					if deviceEvent.ID == DeviceIDN {
 						ID = deviceEvent.ID
 						if TokenClient = Client.Publish(dtcommon.DeviceETPrefix+DeviceIDN+dtcommon.DeviceETStateUpdateSuffix, 0, false, body); TokenClient.Wait() && TokenClient.Error() != nil {
-							common.Failf("client.Publish() Error is %s", TokenClient.Error())
+							common.Fatalf("client.Publish() Error is %s", TokenClient.Error())
 						} else {
-							common.InfoV6("client.Publish Success !!")
+							common.Infof("client.Publish Success !!")
 						}
 					}
 				}
@@ -242,7 +240,7 @@ var _ = Describe("Event Bus Testing", func() {
 			}, "10s", "2s").Should(Equal(DeviceIDN), "Device state is not online within specified time")
 			Expect(TokenClient.Error()).NotTo(HaveOccurred())
 			Eventually(func() string {
-				common.InfoV2("subscribed to the topic %v", topic)
+				common.Infof("subscribed to the topic %v", topic)
 				return DeviceState
 			}, "10s", "2s").Should(Equal("online"), "Device state is not online within specified time")
 		})
@@ -253,16 +251,16 @@ var _ = Describe("Event Bus Testing", func() {
 			topic := dtcommon.DeviceETPrefix + DeviceIDN + dtcommon.DeviceETStateUpdateSuffix + "/result"
 			body, err := json.Marshal(message)
 			if err != nil {
-				common.Failf("Marshal failed %v", err)
+				common.Fatalf("Marshal failed %v", err)
 			}
 			Eventually(func() string {
 				var deviceEvent Device
 				for _, deviceEvent = range MemDeviceUpdate.AddDevices {
 					if strings.Compare(deviceEvent.ID, DeviceIDN) == 0 {
 						if TokenClient = Client.Publish(dtcommon.DeviceETPrefix+DeviceIDN+dtcommon.DeviceETStateUpdateSuffix, 0, false, body); TokenClient.Wait() && TokenClient.Error() != nil {
-							common.Failf("client.Publish() Error is %s", TokenClient.Error())
+							common.Fatalf("client.Publish() Error is %s", TokenClient.Error())
 						} else {
-							common.InfoV6("client.Publish Success !!")
+							common.Infof("client.Publish Success !!")
 						}
 					}
 				}
@@ -270,7 +268,7 @@ var _ = Describe("Event Bus Testing", func() {
 			}, "10s", "2s").Should(Equal(DeviceIDN), "Device state is not online within specified time")
 			Expect(TokenClient.Error()).NotTo(HaveOccurred())
 			Eventually(func() string {
-				common.InfoV2("subscribed to the topic %v", topic)
+				common.Infof("subscribed to the topic %v", topic)
 				return DeviceState
 			}, "10s", "2s").Should(Equal("unknown"), "Device state is not unknown within specified time")
 		})
@@ -281,16 +279,16 @@ var _ = Describe("Event Bus Testing", func() {
 			topic := dtcommon.DeviceETPrefix + DeviceIDN + dtcommon.DeviceETStateUpdateSuffix + "/result"
 			body, err := json.Marshal(message)
 			if err != nil {
-				common.Failf("Marshal failed %v", err)
+				common.Fatalf("Marshal failed %v", err)
 			}
 			Eventually(func() string {
 				var deviceEvent Device
 				for _, deviceEvent = range MemDeviceUpdate.AddDevices {
 					if strings.Compare(deviceEvent.ID, DeviceIDN) == 0 {
 						if TokenClient = Client.Publish(dtcommon.DeviceETPrefix+DeviceIDN+dtcommon.DeviceETStateUpdateSuffix, 0, false, body); TokenClient.Wait() && TokenClient.Error() != nil {
-							common.Failf("client.Publish() Error is %s", TokenClient.Error())
+							common.Fatalf("client.Publish() Error is %s", TokenClient.Error())
 						} else {
-							common.InfoV6("client.Publish Success !!")
+							common.Infof("client.Publish Success !!")
 						}
 					}
 				}
@@ -298,7 +296,7 @@ var _ = Describe("Event Bus Testing", func() {
 			}, "10s", "2s").Should(Equal(DeviceIDN), "Device state is not online within specified time")
 			Expect(TokenClient.Error()).NotTo(HaveOccurred())
 			Eventually(func() string {
-				common.InfoV2("subscribed to the topic %v", topic)
+				common.Infof("subscribed to the topic %v", topic)
 				return DeviceState
 			}, "10s", "2s").Should(Equal("offline"), "Device state is not offline within specified time")
 		})
@@ -324,7 +322,7 @@ var _ = Describe("Event Bus Testing", func() {
 
 			Eventually(func() string {
 				attributeDB := GetDeviceAttributesFromDB(DeviceIDWithAttr, "Temperature")
-				common.InfoV2("DeviceID= %s, Value= %s", attributeDB.DeviceID, attributeDB.Value)
+				common.Infof("DeviceID= %s, Value= %s", attributeDB.DeviceID, attributeDB.Value)
 				return attributeDB.Value
 			}, "60s", "2s").Should(Equal("25.25"), "Device is not added within specified time")
 
@@ -343,10 +341,10 @@ var _ = Describe("Event Bus Testing", func() {
 
 			Eventually(func() string {
 				attributeDB := GetTwinAttributesFromDB(DeviceIDWithTwin, "Temperature")
-				common.InfoV2("DeviceID= %s, Value= %s", attributeDB.DeviceID, attributeDB.Expected)
+				common.Infof("DeviceID= %s, Value= %s", attributeDB.DeviceID, attributeDB.Expected)
 				return attributeDB.Expected
 			}, "60s", "2s").Should(Equal("25.25"), "Device is not added within specified time")
-			
+
 		})
 
 		It("TC_TEST_EBUS_11: Update existing device with new attributes", func() {
@@ -361,7 +359,7 @@ var _ = Describe("Event Bus Testing", func() {
 
 			Eventually(func() string {
 				attributeDB := GetDeviceAttributesFromDB(DeviceIDWithAttr, "Temperature")
-				common.InfoV2("DeviceID= %s, Value= %s", attributeDB.DeviceID, attributeDB.Value)
+				common.Infof("DeviceID= %s, Value= %s", attributeDB.DeviceID, attributeDB.Value)
 				return attributeDB.Value
 			}, "60s", "2s").Should(Equal("50.50"), "Device Attributes are not updated within specified time")
 
@@ -379,7 +377,7 @@ var _ = Describe("Event Bus Testing", func() {
 
 			Eventually(func() string {
 				attributeDB := GetTwinAttributesFromDB(DeviceIDWithTwin, "Temperature")
-				common.InfoV2("DeviceID= %s, Value= %s", attributeDB.DeviceID, attributeDB.Expected)
+				common.Infof("DeviceID= %s, Value= %s", attributeDB.DeviceID, attributeDB.Expected)
 				return attributeDB.Expected
 			}, "60s", "2s").Should(Equal("50.50"), "Device Twin Attributes are not updated within specified time")
 
@@ -394,7 +392,7 @@ var _ = Describe("Event Bus Testing", func() {
 
 			Eventually(func() string {
 				attributeDB := GetDeviceAttributesFromDB(DeviceIDWithAttr, "Humidity")
-				common.InfoV2("DeviceID= %s, Value= %s", attributeDB.DeviceID, attributeDB.Value)
+				common.Infof("DeviceID= %s, Value= %s", attributeDB.DeviceID, attributeDB.Value)
 				return attributeDB.Value
 			}, "60s", "2s").Should(Equal("30"), "Device Attributes are not Added within specified time")
 
@@ -409,7 +407,7 @@ var _ = Describe("Event Bus Testing", func() {
 
 			Eventually(func() string {
 				attributeDB := GetTwinAttributesFromDB(DeviceIDWithTwin, "Humidity")
-				common.InfoV2("DeviceID= %s, Value= %s", attributeDB.DeviceID, attributeDB.Expected)
+				common.Infof("DeviceID= %s, Value= %s", attributeDB.DeviceID, attributeDB.Expected)
 				return attributeDB.Expected
 			}, "60s", "2s").Should(Equal("100.100"), "Device Twin Attributes are not Added within specified time")
 

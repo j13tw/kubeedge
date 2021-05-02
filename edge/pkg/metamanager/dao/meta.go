@@ -1,7 +1,9 @@
 package dao
 
 import (
-	"github.com/kubeedge/beehive/pkg/common/log"
+	"strings"
+
+	"k8s.io/klog/v2"
 
 	"github.com/kubeedge/kubeedge/edge/pkg/common/dbm"
 )
@@ -13,7 +15,6 @@ const (
 
 // Meta metadata object
 type Meta struct {
-	// ID    int64  `orm:"pk; auto; column(id)"`
 	Key   string `orm:"column(key); size(256); pk"`
 	Type  string `orm:"column(type); size(32)"`
 	Value string `orm:"column(value); null; type(text)"`
@@ -22,45 +23,55 @@ type Meta struct {
 // SaveMeta save meta to db
 func SaveMeta(meta *Meta) error {
 	num, err := dbm.DBAccess.Insert(meta)
-	log.LOGGER.Debugf("Insert affected Num: %d, %v", num, err)
-	if err == nil || dbm.IsNonUniqueNameError(err) {
+	klog.V(4).Infof("Insert affected Num: %d, %v", num, err)
+	if err == nil || IsNonUniqueNameError(err) {
 		return nil
 	}
 	return err
 }
 
+// IsNonUniqueNameError tests if the error returned by sqlite is unique.
+// It will check various sqlite versions.
+func IsNonUniqueNameError(err error) bool {
+	str := err.Error()
+	if strings.HasSuffix(str, "are not unique") || strings.Contains(str, "UNIQUE constraint failed") || strings.HasSuffix(str, "constraint failed") {
+		return true
+	}
+	return false
+}
+
 // DeleteMetaByKey delete meta by key
 func DeleteMetaByKey(key string) error {
 	num, err := dbm.DBAccess.QueryTable(MetaTableName).Filter("key", key).Delete()
-	log.LOGGER.Debugf("Delete affected Num: %d, %v", num, err)
+	klog.V(4).Infof("Delete affected Num: %d, %v", num, err)
 	return err
 }
 
 // UpdateMeta update meta
 func UpdateMeta(meta *Meta) error {
 	num, err := dbm.DBAccess.Update(meta) // will update all field
-	log.LOGGER.Debugf("Update affected Num: %d, %v", num, err)
+	klog.V(4).Infof("Update affected Num: %d, %v", num, err)
 	return err
 }
 
 // InsertOrUpdate insert or update meta
 func InsertOrUpdate(meta *Meta) error {
 	_, err := dbm.DBAccess.Raw("INSERT OR REPLACE INTO meta (key, type, value) VALUES (?,?,?)", meta.Key, meta.Type, meta.Value).Exec() // will update all field
-	log.LOGGER.Debugf("Update result %v", err)
+	klog.V(4).Infof("Update result %v", err)
 	return err
 }
 
 // UpdateMetaField update special field
 func UpdateMetaField(key string, col string, value interface{}) error {
 	num, err := dbm.DBAccess.QueryTable(MetaTableName).Filter("key", key).Update(map[string]interface{}{col: value})
-	log.LOGGER.Debugf("Update affected Num: %d, %v", num, err)
+	klog.V(4).Infof("Update affected Num: %d, %v", num, err)
 	return err
 }
 
 // UpdateMetaFields update special fields
 func UpdateMetaFields(key string, cols map[string]interface{}) error {
 	num, err := dbm.DBAccess.QueryTable(MetaTableName).Filter("key", key).Update(cols)
-	log.LOGGER.Debugf("Update affected Num: %d, %v", num, err)
+	klog.V(4).Infof("Update affected Num: %d, %v", num, err)
 	return err
 }
 

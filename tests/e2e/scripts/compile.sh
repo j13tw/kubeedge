@@ -28,5 +28,11 @@ if [ $# -eq 0 ]
     echo "compiling all tests !!"
     ginkgo build -r
 else
-    ginkgo build -r $compilemodule
+if [ $compilemodule = 'bluetooth' ]
+    then
+        ginkgo build -r mapper/$compilemodule
+else
+   ginkgo build -r $compilemodule
+fi
+
 fi

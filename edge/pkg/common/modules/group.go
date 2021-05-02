@@ -13,4 +13,8 @@ const (
 	EdgedGroup = "edged"
 	// UserGroup is ServiceBus group
 	UserGroup = "user"
+	// MeshGroup group
+	MeshGroup = "mesh"
+	// StreamGroup group
+	StreamGroup = "edgestream"
 )

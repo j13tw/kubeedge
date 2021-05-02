@@ -1,18 +1,20 @@
 package status
 
 import (
-	edgeapi "github.com/kubeedge/kubeedge/common/types"
 	"time"
 
-	"github.com/kubeedge/beehive/pkg/common/log"
-	"github.com/kubeedge/kubeedge/edge/pkg/edged/metaclient"
-	"github.com/kubeedge/kubeedge/edge/pkg/edged/podmanager"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
+
+	edgeapi "github.com/kubeedge/kubeedge/common/types"
+	"github.com/kubeedge/kubeedge/edge/pkg/edged/podmanager"
+	"github.com/kubeedge/kubeedge/edge/pkg/metamanager/client"
 )
 
 // manager as status manager, embedded a k8s.io/kubernetes/pkg/kubelet/status.Manager
@@ -22,39 +24,53 @@ type manager struct {
 	// TODO: consider need lock?
 	podManager        podmanager.Manager
 	apiStatusVersions map[types.UID]*v1.PodStatus
-	metaClient        metaclient.CoreInterface
+	metaClient        client.CoreInterface
+	podDeletionSafety status.PodDeletionSafetyProvider
 }
 
 //NewManager creates and returns a new manager object
-func NewManager(kubeClient clientset.Interface, podManager podmanager.Manager, podDeletionSafety status.PodDeletionSafetyProvider, metaClient metaclient.CoreInterface) status.Manager {
+func NewManager(kubeClient clientset.Interface, podManager podmanager.Manager, podDeletionSafety status.PodDeletionSafetyProvider, metaClient client.CoreInterface) status.Manager {
 	kubeManager := status.NewManager(kubeClient, podManager, podDeletionSafety)
 	return &manager{
 		Manager:           kubeManager,
 		metaClient:        metaClient,
 		podManager:        podManager,
 		apiStatusVersions: make(map[types.UID]*v1.PodStatus),
+		podDeletionSafety: podDeletionSafety,
 	}
+}
+
+func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus) bool {
+	if pod.DeletionTimestamp == nil {
+		return false
+	}
+	return m.podDeletionSafety.PodResourcesAreReclaimed(pod, status)
 }
 
 const syncPeriod = 10 * time.Second
 
 func (m *manager) Start() {
-	log.LOGGER.Info("Starting to sync pod status with apiserver")
-	syncTicker := time.Tick(syncPeriod)
+	klog.Info("Starting to sync pod status with apiserver")
 
 	go wait.Forever(func() {
-		select {
-		case <-syncTicker:
-			m.updatePodStatus()
-		}
-	}, 0)
+		m.updatePodStatus()
+	}, syncPeriod)
 }
 
 func (m *manager) updatePodStatus() {
 	for _, pod := range m.podManager.GetPods() {
 		uid := pod.UID
 		podStatus, ok := m.GetPodStatus(uid)
-		if !ok || &podStatus == nil {
+		if !ok {
+			// We don't handle graceful deletion of mirror pods.
+			if m.canBeDeleted(pod, podStatus) {
+				err := m.metaClient.Pods(pod.Namespace).Delete(pod.Name, string(pod.UID))
+				if err != nil {
+					klog.Warningf("Failed to delete status for pod %q: %v", format.Pod(pod), err)
+				} else {
+					klog.Errorf("Successfully sent delete event to cloud for pod: %s", format.Pod(pod))
+				}
+			}
 			continue
 		}
 		latestStatus, ok := m.apiStatusVersions[uid]
@@ -95,9 +111,9 @@ func (m *manager) updatePodStatus() {
 
 		err := m.metaClient.PodStatus(pod.Namespace).Update(pod.Name, edgeapi.PodStatusRequest{UID: pod.UID, Name: pod.Name, Status: s})
 		if err != nil {
-			log.LOGGER.Errorf("Update pod status failed err :%v", err)
+			klog.Errorf("Update pod status failed err :%v", err)
 		}
-		log.LOGGER.Infof("Status for pod %s updated successfully: %+v", pod.Name, podStatus)
+		klog.Infof("Status for pod %s updated successfully: %+v", pod.Name, podStatus)
 		m.apiStatusVersions[pod.UID] = podStatus.DeepCopy()
 	}
 }

@@ -18,6 +18,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"sort"
 	"sync"
 
 	"github.com/eclipse/paho.mqtt.golang/packets"
@@ -150,17 +151,22 @@ func (store *FileStore) Reset() {
 
 // lockless
 func (store *FileStore) all() []string {
+	var err error
+	var keys []string
+	var files fileInfos
+
 	if !store.opened {
 		ERROR.Println(STR, "Trying to use file store, but not open")
 		return nil
 	}
-	keys := []string{}
-	files, rderr := ioutil.ReadDir(store.directory)
-	chkerr(rderr)
+
+	files, err = ioutil.ReadDir(store.directory)
+	chkerr(err)
+	sort.Sort(files)
 	for _, f := range files {
 		DEBUG.Println(STR, "file in All():", f.Name())
 		name := f.Name()
-		if name[len(name)-4:] != msgExt {
+		if name[len(name)-4:len(name)] != msgExt {
 			DEBUG.Println(STR, "skipping file, doesn't have right extension: ", name)
 			continue
 		}
@@ -232,4 +238,18 @@ func exists(file string) bool {
 		chkerr(err)
 	}
 	return true
+}
+
+type fileInfos []os.FileInfo
+
+func (f fileInfos) Len() int {
+	return len(f)
+}
+
+func (f fileInfos) Swap(i, j int) {
+	f[i], f[j] = f[j], f[i]
+}
+
+func (f fileInfos) Less(i, j int) bool {
+	return f[i].ModTime().Before(f[j].ModTime())
 }

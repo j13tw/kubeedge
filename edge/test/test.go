@@ -2,20 +2,20 @@ package test
 
 import (
 	"encoding/json"
-	"github.com/kubeedge/kubeedge/edge/pkg/common/modules"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"sync"
 	"time"
 
-	"github.com/kubeedge/beehive/pkg/common/log"
-	"github.com/kubeedge/beehive/pkg/core"
-	"github.com/kubeedge/beehive/pkg/core/context"
-	"github.com/kubeedge/beehive/pkg/core/model"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 
+	"github.com/kubeedge/beehive/pkg/core"
+	beehiveContext "github.com/kubeedge/beehive/pkg/core/context"
+	"github.com/kubeedge/beehive/pkg/core/model"
 	"github.com/kubeedge/kubeedge/edge/pkg/common/message"
-	"k8s.io/api/core/v1"
+	"github.com/kubeedge/kubeedge/edge/pkg/common/modules"
+	"github.com/kubeedge/kubeedge/pkg/apis/componentconfig/edgecore/v1alpha1"
 )
 
 const (
@@ -24,17 +24,13 @@ const (
 	EdgedPodHandler = "/pods"
 )
 
-func init() {
-	core.Register(&testManager{})
+// TODO move this files into /edge/pkg/dbtest @kadisi
+func Register(t *v1alpha1.DBTest) {
+	core.Register(&testManager{enable: t.Enable})
 }
 
 type testManager struct {
-	context    *context.Context
-	moduleWait *sync.WaitGroup
-}
-
-type meta struct {
-	UID string `json:"uid"`
+	enable bool
 }
 
 func (tm *testManager) Name() string {
@@ -46,6 +42,10 @@ func (tm *testManager) Group() string {
 	return modules.MetaGroup
 }
 
+func (tm *testManager) Enable() bool {
+	return tm.enable
+}
+
 //Function to get the pods from Edged
 func GetPodListFromEdged(w http.ResponseWriter) error {
 	var pods v1.PodList
@@ -55,29 +55,29 @@ func GetPodListFromEdged(w http.ResponseWriter) error {
 	req, err := http.NewRequest(http.MethodGet, edgedEndPoint+EdgedPodHandler, bytes)
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	if err != nil {
-		log.LOGGER.Errorf("Frame HTTP request failed: %v", err)
+		klog.Errorf("Frame HTTP request failed: %v", err)
 		return err
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.LOGGER.Errorf("Sending HTTP request failed: %v", err)
+		klog.Errorf("Sending HTTP request failed: %v", err)
 		return err
 	}
-	log.LOGGER.Infof("%s %s %v in %v", req.Method, req.URL, resp.Status, time.Now().Sub(t))
+	klog.Infof("%s %s %v in %v", req.Method, req.URL, resp.Status, time.Since(t))
 	defer resp.Body.Close()
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.LOGGER.Errorf("HTTP Response reading has failed: %v", err)
+		klog.Errorf("HTTP Response reading has failed: %v", err)
 		return err
 	}
 	err = json.Unmarshal(contents, &pods)
 	if err != nil {
-		log.LOGGER.Errorf("Json Unmarshal has failed: %v", err)
+		klog.Errorf("Json Unmarshal has failed: %v", err)
 		return err
 	}
 	respBody, err := json.Marshal(pods)
 	if err != nil {
-		log.LOGGER.Errorf("Json Marshal failed: %v", err)
+		klog.Errorf("Json Marshal failed: %v", err)
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -93,26 +93,26 @@ func (tm *testManager) podHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodGet {
 		err := GetPodListFromEdged(w)
 		if err != nil {
-			log.LOGGER.Errorf("Get podlist from Edged has failed: %v", err)
+			klog.Errorf("Get podlist from Edged has failed: %v", err)
 		}
 	} else if req.Body != nil {
 		body, err := ioutil.ReadAll(req.Body)
 		if err != nil {
-			log.LOGGER.Errorf("read body error %v", err)
+			klog.Errorf("read body error %v", err)
 			w.Write([]byte("read request body error"))
 		}
-		log.LOGGER.Infof("request body is %s\n", string(body))
+		klog.Infof("request body is %s\n", string(body))
 		if err = json.Unmarshal(body, &p); err != nil {
-			log.LOGGER.Errorf("unmarshal request body error %v", err)
+			klog.Errorf("unmarshal request body error %v", err)
 			w.Write([]byte("unmarshal request body error"))
 		}
 
 		switch req.Method {
-		case "POST":
+		case http.MethodPost:
 			operation = model.InsertOperation
-		case "DELETE":
+		case http.MethodDelete:
 			operation = model.DeleteOperation
-		case "PUT":
+		case http.MethodPut:
 			operation = model.UpdateOperation
 		}
 
@@ -120,9 +120,9 @@ func (tm *testManager) podHandler(w http.ResponseWriter, req *http.Request) {
 		if p.Namespace != "" {
 			ns = p.Namespace
 		}
-		msgReq := message.BuildMsg("resource", string(p.UID), "controller", ns+"/pod/"+string(p.Name), operation, p)
-		tm.context.Send("metaManager", *msgReq)
-		log.LOGGER.Infof("send message to metaManager is %+v\n", msgReq)
+		msgReq := message.BuildMsg("resource", string(p.UID), "edgecontroller", ns+"/pod/"+string(p.Name), operation, p)
+		beehiveContext.Send("metaManager", *msgReq)
+		klog.Infof("send message to metaManager is %+v\n", msgReq)
 	}
 }
 
@@ -134,26 +134,26 @@ func (tm *testManager) deviceHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Body != nil {
 		body, err := ioutil.ReadAll(req.Body)
 		if err != nil {
-			log.LOGGER.Errorf("read body error %v", err)
+			klog.Errorf("read body error %v", err)
 			w.Write([]byte("read request body error"))
 		}
-		log.LOGGER.Infof("request body is %s\n", string(body))
+		klog.Infof("request body is %s\n", string(body))
 		err = json.Unmarshal(body, &Content)
 		if err != nil {
-			log.LOGGER.Errorf("unmarshal request body error %v", err)
+			klog.Errorf("unmarshal request body error %v", err)
 			w.Write([]byte("unmarshal request body error"))
 		}
 		switch req.Method {
-		case "POST":
+		case http.MethodPost:
 			operation = model.InsertOperation
-		case "DELETE":
+		case http.MethodDelete:
 			operation = model.DeleteOperation
-		case "PUT":
+		case http.MethodPut:
 			operation = model.UpdateOperation
 		}
 		msgReq := message.BuildMsg("edgehub", "", "edgemgr", "membership", operation, Content)
-		tm.context.Send("twin", *msgReq)
-		log.LOGGER.Infof("send message to twingrp is %+v\n", msgReq)
+		beehiveContext.Send("twin", *msgReq)
+		klog.Infof("send message to twingrp is %+v\n", msgReq)
 	}
 }
 
@@ -163,27 +163,27 @@ func (tm *testManager) secretHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Body != nil {
 		body, err := ioutil.ReadAll(req.Body)
 		if err != nil {
-			log.LOGGER.Errorf("read body error %v", err)
+			klog.Errorf("read body error %v", err)
 			w.Write([]byte("read request body error"))
 		}
-		log.LOGGER.Infof("request body is %s\n", string(body))
+		klog.Infof("request body is %s\n", string(body))
 		if err = json.Unmarshal(body, &p); err != nil {
-			log.LOGGER.Errorf("unmarshal request body error %v", err)
+			klog.Errorf("unmarshal request body error %v", err)
 			w.Write([]byte("unmarshal request body error"))
 		}
 
 		switch req.Method {
-		case "POST":
+		case http.MethodPost:
 			operation = model.InsertOperation
-		case "DELETE":
+		case http.MethodDelete:
 			operation = model.DeleteOperation
-		case "PUT":
+		case http.MethodPut:
 			operation = model.UpdateOperation
 		}
 
 		msgReq := message.BuildMsg("edgehub", string(p.UID), "test", "fakeNamespace/secret/"+string(p.UID), operation, p)
-		tm.context.Send("metaManager", *msgReq)
-		log.LOGGER.Infof("send message to metaManager is %+v\n", msgReq)
+		beehiveContext.Send("metaManager", *msgReq)
+		klog.Infof("send message to metaManager is %+v\n", msgReq)
 	}
 }
 
@@ -193,44 +193,37 @@ func (tm *testManager) configmapHandler(w http.ResponseWriter, req *http.Request
 	if req.Body != nil {
 		body, err := ioutil.ReadAll(req.Body)
 		if err != nil {
-			log.LOGGER.Errorf("read body error %v", err)
+			klog.Errorf("read body error %v", err)
 			w.Write([]byte("read request body error"))
 		}
-		log.LOGGER.Infof("request body is %s\n", string(body))
+		klog.Infof("request body is %s\n", string(body))
 		if err = json.Unmarshal(body, &p); err != nil {
-			log.LOGGER.Errorf("unmarshal request body error %v", err)
+			klog.Errorf("unmarshal request body error %v", err)
 			w.Write([]byte("unmarshal request body error"))
 		}
 
 		switch req.Method {
-		case "POST":
+		case http.MethodPost:
 			operation = model.InsertOperation
-		case "DELETE":
+		case http.MethodDelete:
 			operation = model.DeleteOperation
-		case "PUT":
+		case http.MethodPut:
 			operation = model.UpdateOperation
 		}
 
 		msgReq := message.BuildMsg("edgehub", string(p.UID), "test", "fakeNamespace/configmap/"+string(p.UID), operation, p)
-		tm.context.Send("metaManager", *msgReq)
-		log.LOGGER.Infof("send message to metaManager is %+v\n", msgReq)
+		beehiveContext.Send("metaManager", *msgReq)
+		klog.Infof("send message to metaManager is %+v\n", msgReq)
 	}
 }
 
-func (tm *testManager) Start(c *context.Context) {
-	tm.context = c
-	defer tm.Cleanup()
-
+func (tm *testManager) Start() {
 	http.HandleFunc("/pods", tm.podHandler)
 	http.HandleFunc("/configmap", tm.configmapHandler)
 	http.HandleFunc("/secret", tm.secretHandler)
 	http.HandleFunc("/devices", tm.deviceHandler)
 	err := http.ListenAndServe(":12345", nil)
 	if err != nil {
-		log.LOGGER.Errorf("ListenAndServe: %v", err)
+		klog.Errorf("ListenAndServe: %v", err)
 	}
-}
-
-func (tm *testManager) Cleanup() {
-	tm.context.Cleanup(tm.Name())
 }

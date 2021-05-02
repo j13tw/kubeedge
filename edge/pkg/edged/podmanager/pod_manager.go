@@ -23,7 +23,7 @@ package podmanager
 import (
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
@@ -48,18 +48,9 @@ func NewPodManager() pod.Manager {
 	pm := &podManager{
 		MockManager: new(testing.MockManager),
 	}
-	pm.SetPods(nil)
-	return pm
-}
-
-// Set the internal pods based on the new pods.
-func (pm *podManager) SetPods(newPods []*v1.Pod) {
-	pm.lock.Lock()
-	defer pm.lock.Unlock()
-
 	pm.podByUID = make(map[types.UID]*v1.Pod)
 	pm.podByFullName = make(map[string]*v1.Pod)
-	pm.updatePodsInternal(newPods...)
+	return pm
 }
 
 func (pm *podManager) AddPod(pod *v1.Pod) {
@@ -114,8 +105,8 @@ func (pm *podManager) GetPodByFullName(podFullName string) (*v1.Pod, bool) {
 }
 
 func (pm *podManager) DeletePod(pod *v1.Pod) {
-	pm.lock.RLock()
-	defer pm.lock.RUnlock()
+	pm.lock.Lock()
+	defer pm.lock.Unlock()
 	podFullName := container.GetPodFullName(pod)
 	delete(pm.podByUID, pod.UID)
 	delete(pm.podByFullName, podFullName)

@@ -7,39 +7,36 @@ import (
 	"strings"
 )
 
-const (
-	//MAXTWINNUM max twin key
-	MAXTWINNUM = 64
-)
-
 //ValidateValue validate value type
 func ValidateValue(valueType string, value string) error {
-	if valueType == "" {
+	switch valueType {
+	case "":
 		valueType = "string"
-	}
-	if strings.Compare(valueType, "string") == 0 {
 		return nil
-	} else if strings.Compare(valueType, "int") == 0 {
+	case "string":
+		return nil
+	case "int":
 		_, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			return errors.New("The value is not int")
+			return errors.New("the value is not int")
 		}
 		return nil
-	} else if strings.Compare(valueType, "float") == 0 {
+	case "float":
 		_, err := strconv.ParseFloat(value, 64)
 		if err != nil {
-			return errors.New("The value is not float")
+			return errors.New("the value is not float")
 		}
 		return nil
-	} else if strings.Compare(valueType, "boolean") == 0 {
+	case "boolean":
 		if strings.Compare(value, "true") != 0 && strings.Compare(value, "false") != 0 {
-			return errors.New("The bool value must be true or false")
+			return errors.New("the bool value must be true or false")
 		}
 		return nil
-	} else if strings.Compare(valueType, "deleted") == 0 {
+	case "deleted":
 		return nil
+	default:
+		return errors.New("the value type is not allowed")
 	}
-	return errors.New("The value type is not allowed")
 }
 
 //ValidateTwinKey validate twin key
